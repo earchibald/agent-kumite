@@ -103,7 +103,7 @@ If (6) holds in particular, presentation is no longer downstream of the data mod
 | Benchmark protocol, hypotheses, baselines | `Agent Kumite.md` §5, AK-6 |
 | Structured commitments schema | REC-04, AK-7 |
 | Observation vs intervention separation | REC-08, AK-3, `docs/superpowers/specs/observation-vs-intervention.md` |
-| Thought-trace labeling | REC-07, AK-4 |
+| Thought-trace labeling | REC-07, AK-4, `docs/superpowers/specs/thought-trace-labeling.md` |
 | Roster identity / cast / model badges | REC-13, AK-10 |
 | Pressure shell / tension director | REC-14, AK-11 |
 | Swift control room | REC-09, AK-14 |
