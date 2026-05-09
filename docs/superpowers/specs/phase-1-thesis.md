@@ -102,7 +102,7 @@ If (6) holds in particular, presentation is no longer downstream of the data mod
 | v0 match spec (player count, roles, rounds, scoring) | `Agent Kumite.md` §4, AK-5 |
 | Benchmark protocol, hypotheses, baselines | `Agent Kumite.md` §5, AK-6 |
 | Structured commitments schema | REC-04, AK-7 |
-| Observation vs intervention separation | REC-08, AK-3 |
+| Observation vs intervention separation | REC-08, AK-3, `docs/superpowers/specs/observation-vs-intervention.md` |
 | Thought-trace labeling | REC-07, AK-4 |
 | Roster identity / cast / model badges | REC-13, AK-10 |
 | Pressure shell / tension director | REC-14, AK-11 |
