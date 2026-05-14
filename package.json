@@ -5,7 +5,8 @@
   "scripts": {
     "test": "vitest run",
     "build": "tsc -p tsconfig.json",
-    "simulate": "node dist/cli.js"
+    "simulate": "node dist/cli.js",
+    "report": "node dist/report-cli.js"
   },
   "exports": {
     ".": {
@@ -14,7 +15,8 @@
     }
   },
   "bin": {
-    "agent-kumite-harness": "./dist/cli.js"
+    "agent-kumite-harness": "./dist/cli.js",
+    "agent-kumite-report": "./dist/report-cli.js"
   },
   "type": "module",
   "private": true,
