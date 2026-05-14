@@ -3,6 +3,7 @@ import { resolve, join } from 'node:path';
 
 import { runHarnessFromFile } from './cli-lib.js';
 import { writeAftermathReportFromFile } from './report-cli-lib.js';
+import type { ArtifactBundle } from './schema.js';
 
 export interface BundleCliOptions {
   inputPath: string;
@@ -14,6 +15,7 @@ export interface BundleRunResult {
   artifactPath: string;
   reportPath: string;
   benchmarkSummaryPath: string;
+  artifactBundle: ArtifactBundle;
 }
 
 export function parseBundleCliArgs(args: readonly string[]): BundleCliOptions {
@@ -84,7 +86,12 @@ export async function runHarnessBundleFromFile(options: BundleCliOptions): Promi
     JSON.stringify(result.artifactBundle.benchmarkSummary, null, options.pretty ? 2 : undefined),
   );
 
-  return { artifactPath, reportPath, benchmarkSummaryPath };
+  return {
+    artifactPath,
+    reportPath,
+    benchmarkSummaryPath,
+    artifactBundle: result.artifactBundle,
+  };
 }
 
 export function bundleUsageText(): string {

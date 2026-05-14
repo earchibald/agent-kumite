@@ -10,6 +10,10 @@ import {
   validateArtifactBundle,
 } from '../src/index.ts';
 
+function fixturePath(name: string): string {
+  return new URL(`../fixtures/${name}`, import.meta.url).pathname;
+}
+
 describe('bundled local harness output', () => {
   it('parses the bundled CLI contract', () => {
     const parsed = parseBundleCliArgs(['--input', 'fixtures/demo-match.input.json', '--output-dir', 'out/demo', '--pretty']);
@@ -22,7 +26,7 @@ describe('bundled local harness output', () => {
   it('writes artifacts and aftermath report into a predictable directory', async () => {
     const outputDir = await mkdtemp(join(tmpdir(), 'agent-kumite-bundle-'));
     const result = await runHarnessBundleFromFile({
-      inputPath: join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-26', 'fixtures/demo-match.input.json'),
+      inputPath: fixturePath('demo-match.input.json'),
       outputDir,
       pretty: true,
     });

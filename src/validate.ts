@@ -5,6 +5,9 @@ import {
   ArtifactBundleSchema,
   AwaitKind,
   AwaitRecordSchema,
+  BenchmarkBatchLedgerSchema,
+  BenchmarkBatchPlan,
+  BenchmarkBatchPlanSchema,
   CommitmentClaim,
   Condition,
   MatchStateSchema,
@@ -67,6 +70,42 @@ export function validateArtifactBundle(value: unknown): string[] {
   }
 
   return validateArtifactBundleConsistency(value as ArtifactBundle);
+}
+
+export function validateBenchmarkBatchPlan(value: unknown): string[] {
+  const schemaErrors = validateWith(BenchmarkBatchPlanSchema, value);
+  if (schemaErrors.length > 0) {
+    return schemaErrors;
+  }
+
+  const plan = value as BenchmarkBatchPlan;
+  const errors: string[] = [];
+  const seenConditions = new Set<Condition>();
+  for (const condition of plan.conditions) {
+    if (seenConditions.has(condition.condition)) {
+      errors.push(`duplicate batch condition ${condition.condition}`);
+    }
+    seenConditions.add(condition.condition);
+  }
+
+  const seenOverrides = new Set<string>();
+  for (const override of plan.runOverrides ?? []) {
+    if (!seenConditions.has(override.condition)) {
+      errors.push(`run override references undeclared condition ${override.condition}`);
+    }
+
+    const key = `${override.condition}:${override.runSeed}`;
+    if (seenOverrides.has(key)) {
+      errors.push(`duplicate run override for ${override.condition} seed ${override.runSeed}`);
+    }
+    seenOverrides.add(key);
+  }
+
+  return errors;
+}
+
+export function validateBenchmarkBatchLedger(value: unknown): string[] {
+  return validateWith(BenchmarkBatchLedgerSchema, value);
 }
 
 export function allowedAwaitKindsForCondition(condition: Condition): AwaitKind[] {

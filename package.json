@@ -8,6 +8,7 @@
     "simulate": "node dist/cli.js",
     "report": "node dist/report-cli.js",
     "bundle": "node dist/bundle-cli.js",
+    "batch": "node dist/batch-cli.js",
     "matrix": "node dist/matrix-cli.js"
   },
   "exports": {
@@ -20,6 +21,7 @@
     "agent-kumite-harness": "./dist/cli.js",
     "agent-kumite-report": "./dist/report-cli.js",
     "agent-kumite-bundle": "./dist/bundle-cli.js",
+    "agent-kumite-batch": "./dist/batch-cli.js",
     "agent-kumite-matrix": "./dist/matrix-cli.js"
   },
   "type": "module",

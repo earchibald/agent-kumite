@@ -6,6 +6,10 @@ import { describe, expect, it } from 'vitest';
 
 import { parseCliArgs, runHarnessFromFile, validateArtifactBundle } from '../src/index.ts';
 
+function fixturePath(name: string): string {
+  return new URL(`../fixtures/${name}`, import.meta.url).pathname;
+}
+
 describe('local harness CLI', () => {
   it('parses the minimal CLI contract', () => {
     const parsed = parseCliArgs(['--input', 'fixtures/demo-match.input.json', '--output', 'out/demo.json', '--pretty']);
@@ -19,7 +23,7 @@ describe('local harness CLI', () => {
     const dir = await mkdtemp(join(tmpdir(), 'agent-kumite-cli-'));
     const outputPath = join(dir, 'artifacts.json');
     const result = await runHarnessFromFile({
-      inputPath: join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-26', 'fixtures/demo-match.input.json'),
+      inputPath: fixturePath('demo-match.input.json'),
       outputPath,
       pretty: true,
     });

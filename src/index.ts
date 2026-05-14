@@ -6,5 +6,6 @@ export * from './cli-lib.js';
 export * from './report.js';
 export * from './report-cli-lib.js';
 export * from './bundle-cli-lib.js';
+export * from './batch-cli-lib.js';
 export * from './matrix.js';
 export * from './matrix-cli-lib.js';

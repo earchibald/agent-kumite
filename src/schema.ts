@@ -618,6 +618,76 @@ export const BenchmarkSummarySchema = Type.Object(
 );
 export type BenchmarkSummary = Static<typeof BenchmarkSummarySchema>;
 
+export const BenchmarkBatchConditionPlanSchema = Type.Object(
+  {
+    condition: ConditionSchema,
+    inputPath: Type.String({ minLength: 1 }),
+  },
+  { $id: 'BenchmarkBatchConditionPlan' },
+);
+export type BenchmarkBatchConditionPlan = Static<typeof BenchmarkBatchConditionPlanSchema>;
+
+export const BenchmarkBatchRunOverrideSchema = Type.Object(
+  {
+    condition: ConditionSchema,
+    runSeed: Type.Integer({ minimum: 0 }),
+    inputPath: Type.Optional(Type.String({ minLength: 1 })),
+    validityStatus: Type.Optional(ValidityStatusSchema),
+    invalidationReason: Type.Optional(Type.String({ minLength: 1 })),
+    codeRevision: Type.Optional(Type.String({ minLength: 7 })),
+  },
+  { $id: 'BenchmarkBatchRunOverride' },
+);
+export type BenchmarkBatchRunOverride = Static<typeof BenchmarkBatchRunOverrideSchema>;
+
+export const BenchmarkBatchPlanSchema = Type.Object(
+  {
+    batchId: IdSchema,
+    seedLedger: Type.Array(Type.Integer({ minimum: 0 }), { minItems: 1, uniqueItems: true }),
+    targetMatchedSeedCount: Type.Integer({ minimum: 1 }),
+    conditions: Type.Array(BenchmarkBatchConditionPlanSchema, { minItems: 1 }),
+    runOverrides: Type.Optional(Type.Array(BenchmarkBatchRunOverrideSchema)),
+  },
+  { $id: 'BenchmarkBatchPlan' },
+);
+export type BenchmarkBatchPlan = Static<typeof BenchmarkBatchPlanSchema>;
+
+export const BenchmarkBatchRunRecordSchema = Type.Object(
+  {
+    runId: IdSchema,
+    matchId: IdSchema,
+    condition: ConditionSchema,
+    runSeed: Type.Integer({ minimum: 0 }),
+    validityStatus: ValidityStatusSchema,
+    invalidationReason: Type.Optional(Type.String({ minLength: 1 })),
+    selectedForMatrix: Type.Boolean(),
+    inputPath: Type.String({ minLength: 1 }),
+    outputDir: Type.String({ minLength: 1 }),
+    artifactPath: Type.String({ minLength: 1 }),
+    reportPath: Type.String({ minLength: 1 }),
+    benchmarkSummaryPath: Type.String({ minLength: 1 }),
+  },
+  { $id: 'BenchmarkBatchRunRecord' },
+);
+export type BenchmarkBatchRunRecord = Static<typeof BenchmarkBatchRunRecordSchema>;
+
+export const BenchmarkBatchLedgerSchema = Type.Object(
+  {
+    batchId: IdSchema,
+    declaredConditions: Type.Array(ConditionSchema, { minItems: 1 }),
+    declaredSeedLedger: Type.Array(Type.Integer({ minimum: 0 }), { minItems: 1, uniqueItems: true }),
+    targetMatchedSeedCount: Type.Integer({ minimum: 1 }),
+    fullyMatchedSeeds: Type.Array(Type.Integer({ minimum: 0 }), { uniqueItems: true }),
+    selectedSeeds: Type.Array(Type.Integer({ minimum: 0 }), { uniqueItems: true }),
+    targetReached: Type.Boolean(),
+    executedRunCount: Type.Integer({ minimum: 0 }),
+    matrixInputPaths: Type.Array(Type.String({ minLength: 1 })),
+    runs: Type.Array(BenchmarkBatchRunRecordSchema),
+  },
+  { $id: 'BenchmarkBatchLedger' },
+);
+export type BenchmarkBatchLedger = Static<typeof BenchmarkBatchLedgerSchema>;
+
 export const ReplayBundleSchema = Type.Object(
   {
     runId: IdSchema,
@@ -678,6 +748,11 @@ export const RuntimeSchemas = {
   ArtifactBundleSchema,
   AwaitRecordSchema,
   BenchmarkSummarySchema,
+  BenchmarkBatchConditionPlanSchema,
+  BenchmarkBatchLedgerSchema,
+  BenchmarkBatchPlanSchema,
+  BenchmarkBatchRunOverrideSchema,
+  BenchmarkBatchRunRecordSchema,
   CommitmentClaimSchema,
   CommitmentDivergenceRecordSchema,
   ConditionSchema,
