@@ -137,7 +137,7 @@ Examples of compliant placements:
 | Surface | Spec | Affected scope |
 | :--- | :--- | :--- |
 | Swift control room | AK-14 | trace drawer, trajectory view, intervention preview when a nudge/approval references trace content |
-| Layered UI separation | AK-13 | the "private state" layer that owns trace surfacing, distinct from public events / alerts / interventions |
+| Layered UI separation | AK-13, `docs/superpowers/specs/layered-ui.md` | the "private state" layer that owns trace surfacing, distinct from public events / alerts / interventions |
 | Discord layer | AK-15 | any channel that mirrors trace contents to operators; RBAC governs who sees the channel, this spec governs how the contents render |
 | Referee grimoire | AK-8 | god-view rendering of trace contents alongside public events and structured commitments — the grimoire MUST keep traces in their own visually-distinct container |
 | Replay artifacts | downstream of AK-14 | scrubbing, drill-down, export — same prefix / label / blurb rules apply |
