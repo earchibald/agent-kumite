@@ -1,4 +1,5 @@
 import {
+  addStructuredCommitmentEnvelopes,
   advanceMatchState,
   applyScoreDeltas,
   computeFinalOutcome,
@@ -6,6 +7,7 @@ import {
   createArtifactBundle,
   createInitialMatchState,
   determineElimination,
+  revealStructuredCommitments,
   resolveAwaitByDefault,
   snapshotFromMatchState,
   spendDmBudget,
@@ -15,13 +17,13 @@ import type {
   AlertRecord,
   ArtifactBundle,
   AwaitRecord,
-  CommitmentRef,
   InterventionRecord,
   MatchState,
   PublicEvent,
   ReplaySnapshot,
   RosterEntry,
   RunManifest,
+  StructuredCommitmentEnvelope,
   TaskOutputRef,
 } from './schema.js';
 
@@ -37,7 +39,7 @@ export interface SimulatedUtterance {
 export interface SimulatedRoundInput {
   publicUtterances?: readonly SimulatedUtterance[];
   dmSpends?: DmSpendMap;
-  structuredCommitments?: readonly CommitmentRef[];
+  structuredCommitments?: readonly StructuredCommitmentEnvelope[];
   intendedVotes?: VoteMap;
   revealedVotes?: VoteMap;
   taskScores: TaskScoreMap;
@@ -144,7 +146,6 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
   const snapshots: ReplaySnapshot[] = [];
   const privateArtifacts: ArtifactBundle['privateArtifacts'] = [];
   const alerts: AlertRecord[] = [];
-  const structuredCommitments: CommitmentRef[] = [];
   const taskOutputs: TaskOutputRef[] = [];
   const roundDeltasByAgent: Record<string, number[]> = Object.fromEntries(
     input.roster.map((entry) => [entry.agentId, []]),
@@ -168,7 +169,7 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
     }
 
     state = advanceMatchState(state); // structured_commitment_submission
-    structuredCommitments.push(...(roundInput.structuredCommitments ?? []));
+    state = addStructuredCommitmentEnvelopes(state, roundInput.structuredCommitments ?? []);
 
     state = advanceMatchState(state); // public_square
     for (const [utteranceIndex, utterance] of (roundInput.publicUtterances ?? []).entries()) {
@@ -216,6 +217,8 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
     }
 
     state = advanceMatchState(state); // simultaneous_reveal
+    const commitmentReveal = revealStructuredCommitments(state, isoTimestamp(round, phaseOrderIndex(state.current.phase), 2));
+    state = commitmentReveal.state;
     if (roundInput.revealedVotes && Object.keys(roundInput.revealedVotes).length > 0) {
       publicEvents.push(
         buildPublicEvent(state.runId, state.matchId, round, state.current.phase, 'vote_reveal', Object.keys(roundInput.revealedVotes), [], {
@@ -231,9 +234,17 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
           round,
           state.current.phase,
           'commitment_reveal',
-          [],
-          roundInput.structuredCommitments?.map((commitment) => commitment.commitmentId) ?? [],
-          { count: roundInput.structuredCommitments?.length ?? 0 },
+          commitmentReveal.revealedCommitments.map((envelope) => envelope.agentId),
+          commitmentReveal.revealedCommitments.flatMap((envelope) =>
+            envelope.commitments.map((commitment) => commitment.commitmentId),
+          ),
+          {
+            count: commitmentReveal.revealedCommitments.reduce(
+              (count, envelope) => count + envelope.commitments.length,
+              0,
+            ),
+            envelopeIds: commitmentReveal.revealedCommitments.map((envelope) => envelope.envelopeId),
+          },
         ),
       );
     }
@@ -338,7 +349,7 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
     manifest: input.manifest,
     roster: input.roster,
     publicEvents,
-    structuredCommitments,
+    structuredCommitments: state.structuredCommitments,
     privateArtifacts,
     alerts,
     interventions,

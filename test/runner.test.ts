@@ -9,6 +9,7 @@ import {
   type AwaitRecord,
   type RosterEntry,
   type RunManifest,
+  type StructuredCommitmentEnvelope,
 } from '../src/index.ts';
 
 function readFixture<T>(name: string): T {
@@ -21,6 +22,13 @@ describe('deterministic harness runner', () => {
   const c4Manifest = readFixture<RunManifest>('run-manifest.c4.json');
   const c5Await = readFixture<AwaitRecord>('awaiting.approval.c5.json');
   const roster: RosterEntry[] = artifactFixture.roster;
+  const roundThreeCommitments: StructuredCommitmentEnvelope[] = (
+    artifactFixture.structuredCommitments as StructuredCommitmentEnvelope[]
+  ).map((envelope) => ({
+    ...envelope,
+    runId: c4Manifest.runId,
+    matchId: c4Manifest.matchId,
+  }));
 
   it('simulates a complete C4 run into canonical artifacts', () => {
     const result = runDeterministicMatch({
@@ -61,6 +69,7 @@ describe('deterministic harness runner', () => {
         },
         {
           publicUtterances: [{ agentId: 'agent-alpha', text: 'Alpha nominates Saboteur.' }],
+          structuredCommitments: roundThreeCommitments,
           intendedVotes: {
             'agent-alpha': 'agent-saboteur',
             'agent-bravo': 'agent-saboteur',
@@ -94,6 +103,19 @@ describe('deterministic harness runner', () => {
     expect(result.finalState.eliminatedAgentIds).toEqual(['agent-saboteur']);
     expect(result.finalOutcome.winnerIds).toContain('agent-alpha');
     expect(result.publicEvents.some((event) => event.kind === 'elimination')).toBe(true);
+    expect(result.artifactBundle.structuredCommitments.every((envelope) => envelope.status === 'revealed')).toBe(true);
+    expect(
+      result.artifactBundle.structuredCommitments.flatMap((envelope) => envelope.commitments).map((commitment) => commitment.payload.commitmentType),
+    ).toEqual(expect.arrayContaining(['intended_vote', 'ally_set', 'task_plan', 'betrayal_target']));
+    const revealEvent = result.publicEvents.find((event) => event.kind === 'commitment_reveal');
+    expect(revealEvent?.linkedCommitmentIds).toEqual(
+      expect.arrayContaining([
+        'commit_r3_agent_alpha_vote',
+        'commit_r3_agent_alpha_allies',
+        'commit_r3_agent_saboteur_task_plan',
+        'commit_r3_agent_saboteur_betrayal',
+      ]),
+    );
     expect(result.snapshots).toHaveLength(3);
     expect(validateArtifactBundle(result.artifactBundle)).toEqual([]);
   });

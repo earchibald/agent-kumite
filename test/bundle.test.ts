@@ -22,7 +22,7 @@ describe('bundled local harness output', () => {
   it('writes artifacts and aftermath report into a predictable directory', async () => {
     const outputDir = await mkdtemp(join(tmpdir(), 'agent-kumite-bundle-'));
     const result = await runHarnessBundleFromFile({
-      inputPath: join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-22', 'fixtures/demo-match.input.json'),
+      inputPath: join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-23', 'fixtures/demo-match.input.json'),
       outputDir,
       pretty: true,
     });

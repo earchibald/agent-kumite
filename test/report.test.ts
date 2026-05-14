@@ -17,7 +17,7 @@ describe('aftermath reporting', () => {
     const dir = await mkdtemp(join(tmpdir(), 'agent-kumite-report-'));
     const artifactPath = join(dir, 'artifacts.json');
     const result = await runHarnessFromFile({
-      inputPath: join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-21', 'fixtures/demo-match.input.json'),
+      inputPath: join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-23', 'fixtures/demo-match.input.json'),
       outputPath: artifactPath,
       pretty: true,
     });
@@ -39,7 +39,7 @@ describe('aftermath reporting', () => {
     const artifactPath = join(dir, 'artifact-bundle.json');
     const reportPath = join(dir, 'aftermath.txt');
     const source = await readFile(
-      join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-21', 'fixtures/artifact-bundle.minimal.c5.json'),
+      join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-23', 'fixtures/artifact-bundle.minimal.c5.json'),
       'utf8',
     );
     await writeFile(artifactPath, source);

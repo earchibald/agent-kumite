@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
+  addStructuredCommitmentEnvelopes,
   advanceMatchState,
   computeFinalOutcome,
   computeRoundScoreDeltas,
@@ -10,6 +11,7 @@ import {
   createInitialMatchState,
   determineElimination,
   dmBudgetForRound,
+  revealStructuredCommitments,
   resolveAwaitByDefault,
   snapshotFromMatchState,
   spendDmBudget,
@@ -18,6 +20,7 @@ import {
   type AwaitRecord,
   type RosterEntry,
   type RunManifest,
+  type StructuredCommitmentEnvelope,
 } from '../src/index.ts';
 
 function readFixture<T>(name: string): T {
@@ -123,6 +126,28 @@ describe('core harness engine', () => {
     expect(resolution.awaitRecord.status).toBe('resolved');
     expect(resolution.interventionRecord.choiceId).toBe('reject');
     expect(resolution.interventionRecord.resolvedAt).toBe('2026-05-14T08:00:00Z');
+  });
+
+  it('stores sealed commitment envelopes and reveals them for the active round', () => {
+    let state = createInitialMatchState(manifest, roster);
+    while (state.current.round !== 3 || state.current.phase !== 'structured_commitment_submission') {
+      state = advanceMatchState(state);
+    }
+
+    const submittedCommitments = artifactFixture.structuredCommitments as StructuredCommitmentEnvelope[];
+    state = addStructuredCommitmentEnvelopes(state, submittedCommitments);
+    expect(state.structuredCommitments[0]?.status).toBe('sealed');
+
+    while (state.current.phase !== 'simultaneous_reveal') {
+      state = advanceMatchState(state);
+    }
+
+    const reveal = revealStructuredCommitments(state, '2026-05-14T08:05:00Z');
+    expect(reveal.revealedCommitments).toHaveLength(2);
+    expect(reveal.state.structuredCommitments.every((envelope) => envelope.status === 'revealed')).toBe(true);
+    expect(
+      reveal.state.structuredCommitments.flatMap((envelope) => envelope.commitments).every((commitment) => commitment.revealedAt),
+    ).toBe(true);
   });
 
   it('emits replay and artifact bundles from runtime inputs', () => {

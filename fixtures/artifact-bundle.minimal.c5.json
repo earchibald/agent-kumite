@@ -120,20 +120,83 @@
   ],
   "structuredCommitments": [
     {
-      "commitmentId": "commit_r3_agent_alpha_vote",
+      "envelopeId": "envelope_r3_agent_alpha",
+      "runId": "run_c5_seed_0001",
+      "matchId": "match_seed_0001",
       "agentId": "agent-alpha",
       "round": 3,
-      "commitmentType": "intended_vote",
       "artifactNumber": 5,
-      "status": "sealed"
+      "revealPhase": "simultaneous_reveal",
+      "status": "sealed",
+      "sealedAt": "2026-05-14T07:18:45Z",
+      "commitments": [
+        {
+          "commitmentId": "commit_r3_agent_alpha_vote",
+          "agentId": "agent-alpha",
+          "round": 3,
+          "status": "sealed",
+          "sealedAt": "2026-05-14T07:18:45Z",
+          "linkedEventIds": ["evt_r3_square_01"],
+          "payload": {
+            "commitmentType": "intended_vote",
+            "targetAgentId": "agent-saboteur",
+            "justification": "Saboteur is driving the table off consensus."
+          }
+        },
+        {
+          "commitmentId": "commit_r3_agent_alpha_allies",
+          "agentId": "agent-alpha",
+          "round": 3,
+          "status": "sealed",
+          "sealedAt": "2026-05-14T07:18:45Z",
+          "linkedEventIds": ["evt_r3_square_01"],
+          "payload": {
+            "commitmentType": "ally_set",
+            "allyAgentIds": ["agent-bravo", "agent-delta"],
+            "strength": "hard"
+          }
+        }
+      ]
     },
     {
-      "commitmentId": "commit_r3_agent_saboteur_task_plan",
+      "envelopeId": "envelope_r3_agent_saboteur",
+      "runId": "run_c5_seed_0001",
+      "matchId": "match_seed_0001",
       "agentId": "agent-saboteur",
       "round": 3,
-      "commitmentType": "task_plan",
       "artifactNumber": 5,
-      "status": "sealed"
+      "revealPhase": "simultaneous_reveal",
+      "status": "sealed",
+      "sealedAt": "2026-05-14T07:19:05Z",
+      "commitments": [
+        {
+          "commitmentId": "commit_r3_agent_saboteur_task_plan",
+          "agentId": "agent-saboteur",
+          "round": 3,
+          "status": "sealed",
+          "sealedAt": "2026-05-14T07:19:05Z",
+          "linkedEventIds": [],
+          "payload": {
+            "commitmentType": "task_plan",
+            "summary": "Slow the task lane while looking cooperative.",
+            "collaboratorAgentIds": ["agent-charlie"],
+            "riskLevel": "high"
+          }
+        },
+        {
+          "commitmentId": "commit_r3_agent_saboteur_betrayal",
+          "agentId": "agent-saboteur",
+          "round": 3,
+          "status": "sealed",
+          "sealedAt": "2026-05-14T07:19:05Z",
+          "linkedEventIds": [],
+          "payload": {
+            "commitmentType": "betrayal_target",
+            "targetAgentId": "agent-alpha",
+            "rationale": "Alpha is organizing the majority bloc."
+          }
+        }
+      ]
     }
   ],
   "privateArtifacts": [

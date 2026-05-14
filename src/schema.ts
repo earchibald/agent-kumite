@@ -143,6 +143,12 @@ export const CommitmentTypeSchema = Type.Union(
 );
 export type CommitmentType = Static<typeof CommitmentTypeSchema>;
 
+export const CommitmentStatusSchema = Type.Union(
+  [Type.Literal('sealed'), Type.Literal('revealed'), Type.Literal('revoked')],
+  { $id: 'CommitmentStatus' },
+);
+export type CommitmentStatus = Static<typeof CommitmentStatusSchema>;
+
 export const PrivateArtifactKindSchema = Type.Union(
   [
     Type.Literal('dm'),
@@ -226,18 +232,113 @@ export const RosterEntrySchema = Type.Object(
 );
 export type RosterEntry = Static<typeof RosterEntrySchema>;
 
-export const CommitmentRefSchema = Type.Object(
+export const IntendedVoteCommitmentPayloadSchema = Type.Object(
+  {
+    commitmentType: Type.Literal('intended_vote'),
+    targetAgentId: IdSchema,
+    justification: Type.Optional(Type.String({ minLength: 1 })),
+  },
+  { $id: 'IntendedVoteCommitmentPayload' },
+);
+export type IntendedVoteCommitmentPayload = Static<typeof IntendedVoteCommitmentPayloadSchema>;
+
+export const AllySetCommitmentPayloadSchema = Type.Object(
+  {
+    commitmentType: Type.Literal('ally_set'),
+    allyAgentIds: Type.Array(IdSchema, { minItems: 1, maxItems: 5, uniqueItems: true }),
+    strength: Type.Union([Type.Literal('soft'), Type.Literal('hard')]),
+  },
+  { $id: 'AllySetCommitmentPayload' },
+);
+export type AllySetCommitmentPayload = Static<typeof AllySetCommitmentPayloadSchema>;
+
+export const BetrayalTargetCommitmentPayloadSchema = Type.Object(
+  {
+    commitmentType: Type.Literal('betrayal_target'),
+    targetAgentId: IdSchema,
+    rationale: Type.Optional(Type.String({ minLength: 1 })),
+  },
+  { $id: 'BetrayalTargetCommitmentPayload' },
+);
+export type BetrayalTargetCommitmentPayload = Static<typeof BetrayalTargetCommitmentPayloadSchema>;
+
+export const TaskPlanCommitmentPayloadSchema = Type.Object(
+  {
+    commitmentType: Type.Literal('task_plan'),
+    summary: Type.String({ minLength: 1 }),
+    collaboratorAgentIds: Type.Array(IdSchema, { maxItems: 5, uniqueItems: true }),
+    riskLevel: Type.Union([Type.Literal('low'), Type.Literal('medium'), Type.Literal('high')]),
+  },
+  { $id: 'TaskPlanCommitmentPayload' },
+);
+export type TaskPlanCommitmentPayload = Static<typeof TaskPlanCommitmentPayloadSchema>;
+
+export const FreezeCommitmentPayloadSchema = Type.Object(
+  {
+    commitmentType: Type.Literal('freeze'),
+    reason: Type.String({ minLength: 1 }),
+  },
+  { $id: 'FreezeCommitmentPayload' },
+);
+export type FreezeCommitmentPayload = Static<typeof FreezeCommitmentPayloadSchema>;
+
+export const NudgeCommitmentPayloadSchema = Type.Object(
+  {
+    commitmentType: Type.Literal('nudge'),
+    targetAgentId: IdSchema,
+    prompt: Type.String({ minLength: 1 }),
+  },
+  { $id: 'NudgeCommitmentPayload' },
+);
+export type NudgeCommitmentPayload = Static<typeof NudgeCommitmentPayloadSchema>;
+
+export const StructuredCommitmentPayloadSchema = Type.Union(
+  [
+    IntendedVoteCommitmentPayloadSchema,
+    AllySetCommitmentPayloadSchema,
+    BetrayalTargetCommitmentPayloadSchema,
+    TaskPlanCommitmentPayloadSchema,
+    FreezeCommitmentPayloadSchema,
+    NudgeCommitmentPayloadSchema,
+  ],
+  { $id: 'StructuredCommitmentPayload' },
+);
+export type StructuredCommitmentPayload = Static<typeof StructuredCommitmentPayloadSchema>;
+
+export const StructuredCommitmentSchema = Type.Object(
   {
     commitmentId: IdSchema,
     agentId: IdSchema,
     round: Type.Integer({ minimum: 1, maximum: 5 }),
-    commitmentType: CommitmentTypeSchema,
-    artifactNumber: Type.Literal(5),
-    status: Type.Union([Type.Literal('sealed'), Type.Literal('revealed'), Type.Literal('revoked')]),
+    status: CommitmentStatusSchema,
+    sealedAt: TimestampSchema,
+    revealedAt: Type.Optional(TimestampSchema),
+    revokedAt: Type.Optional(TimestampSchema),
+    linkedEventIds: Type.Array(IdSchema, { uniqueItems: true }),
+    payload: StructuredCommitmentPayloadSchema,
   },
-  { $id: 'CommitmentRef' },
+  { $id: 'StructuredCommitment' },
 );
-export type CommitmentRef = Static<typeof CommitmentRefSchema>;
+export type StructuredCommitment = Static<typeof StructuredCommitmentSchema>;
+
+export const StructuredCommitmentEnvelopeSchema = Type.Object(
+  {
+    envelopeId: IdSchema,
+    runId: IdSchema,
+    matchId: IdSchema,
+    agentId: IdSchema,
+    round: Type.Integer({ minimum: 1, maximum: 5 }),
+    artifactNumber: Type.Literal(5),
+    revealPhase: Type.Literal('simultaneous_reveal'),
+    status: CommitmentStatusSchema,
+    sealedAt: TimestampSchema,
+    revealedAt: Type.Optional(TimestampSchema),
+    revokedAt: Type.Optional(TimestampSchema),
+    commitments: Type.Array(StructuredCommitmentSchema, { minItems: 1 }),
+  },
+  { $id: 'StructuredCommitmentEnvelope' },
+);
+export type StructuredCommitmentEnvelope = Static<typeof StructuredCommitmentEnvelopeSchema>;
 
 export const LayerCollectionsSchema = Type.Object(
   {
@@ -263,7 +364,7 @@ export const MatchStateSchema = Type.Object(
     scoreByAgent: Type.Record(IdSchema, Type.Integer()),
     openAwaitIds: Type.Array(IdSchema, { uniqueItems: true }),
     layers: LayerCollectionsSchema,
-    commitmentRefs: Type.Array(CommitmentRefSchema),
+    structuredCommitments: Type.Array(StructuredCommitmentEnvelopeSchema),
   },
   { $id: 'MatchState' },
 );
@@ -458,7 +559,7 @@ export const ArtifactBundleSchema = Type.Object(
     replayBundle: ReplayBundleSchema,
     roster: Type.Array(RosterEntrySchema, { minItems: 6, maxItems: 6 }),
     publicEvents: Type.Array(PublicEventSchema),
-    structuredCommitments: Type.Array(CommitmentRefSchema),
+    structuredCommitments: Type.Array(StructuredCommitmentEnvelopeSchema),
     privateArtifacts: Type.Array(PrivateArtifactRefSchema),
     alerts: Type.Array(AlertRecordSchema),
     interventions: Type.Array(InterventionRecordSchema),
@@ -473,7 +574,6 @@ export const RuntimeSchemas = {
   AlertRecordSchema,
   ArtifactBundleSchema,
   AwaitRecordSchema,
-  CommitmentRefSchema,
   ConditionSchema,
   FinalScoreRowSchema,
   InterventionRecordSchema,
@@ -485,5 +585,7 @@ export const RuntimeSchemas = {
   ReplaySnapshotSchema,
   RosterEntrySchema,
   RunManifestSchema,
+  StructuredCommitmentEnvelopeSchema,
+  StructuredCommitmentSchema,
   TaskOutputRefSchema,
 } as const;

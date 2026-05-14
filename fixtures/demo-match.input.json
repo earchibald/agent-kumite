@@ -53,6 +53,61 @@
       "publicUtterances": [
         { "agentId": "agent-alpha", "text": "Alpha nominates Saboteur." }
       ],
+      "structuredCommitments": [
+        {
+          "envelopeId": "envelope_r3_agent_alpha",
+          "runId": "run_demo_c4_0001",
+          "matchId": "match_demo_0001",
+          "agentId": "agent-alpha",
+          "round": 3,
+          "artifactNumber": 5,
+          "revealPhase": "simultaneous_reveal",
+          "status": "sealed",
+          "sealedAt": "2026-05-14T00:25:00Z",
+          "commitments": [
+            {
+              "commitmentId": "commit_r3_agent_alpha_vote",
+              "agentId": "agent-alpha",
+              "round": 3,
+              "status": "sealed",
+              "sealedAt": "2026-05-14T00:25:00Z",
+              "linkedEventIds": [],
+              "payload": {
+                "commitmentType": "intended_vote",
+                "targetAgentId": "agent-saboteur",
+                "justification": "Alpha thinks Saboteur is the cleanest elimination."
+              }
+            }
+          ]
+        },
+        {
+          "envelopeId": "envelope_r3_agent_saboteur",
+          "runId": "run_demo_c4_0001",
+          "matchId": "match_demo_0001",
+          "agentId": "agent-saboteur",
+          "round": 3,
+          "artifactNumber": 5,
+          "revealPhase": "simultaneous_reveal",
+          "status": "sealed",
+          "sealedAt": "2026-05-14T00:25:10Z",
+          "commitments": [
+            {
+              "commitmentId": "commit_r3_agent_saboteur_task",
+              "agentId": "agent-saboteur",
+              "round": 3,
+              "status": "sealed",
+              "sealedAt": "2026-05-14T00:25:10Z",
+              "linkedEventIds": [],
+              "payload": {
+                "commitmentType": "task_plan",
+                "summary": "Blend in, then redirect blame after scoring.",
+                "collaboratorAgentIds": ["agent-charlie"],
+                "riskLevel": "medium"
+              }
+            }
+          ]
+        }
+      ],
       "intendedVotes": {
         "agent-alpha": "agent-saboteur",
         "agent-bravo": "agent-saboteur",

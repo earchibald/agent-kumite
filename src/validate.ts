@@ -13,6 +13,8 @@ import {
   RoundPhase,
   RunManifestSchema,
   type ArtifactBundle,
+  type StructuredCommitment,
+  type StructuredCommitmentEnvelope,
 } from './schema.js';
 
 const phaseIndex = new Map<RoundPhase, number>(ROUND_PHASE_ORDER.map((phase, index) => [phase, index]));
@@ -135,7 +137,9 @@ export function validateReplayBundleInvariants(bundle: ReplayBundle): string[] {
 export function validateArtifactBundleConsistency(bundle: ArtifactBundle): string[] {
   const errors: string[] = [];
   const runId = bundle.manifest.runId;
+  const matchId = bundle.manifest.matchId;
   const agentIds = new Set(bundle.roster.map((entry) => entry.agentId));
+  const commitmentIds = new Set<string>();
 
   if (bundle.replayBundle.runId !== runId) {
     errors.push(`replay bundle runId ${bundle.replayBundle.runId} does not match manifest runId ${runId}`);
@@ -162,9 +166,15 @@ export function validateArtifactBundleConsistency(bundle: ArtifactBundle): strin
     }
   }
 
-  for (const commitment of bundle.structuredCommitments) {
-    if (!agentIds.has(commitment.agentId)) {
-      errors.push(`commitment ${commitment.commitmentId} references unknown agent ${commitment.agentId}`);
+  for (const envelope of bundle.structuredCommitments) {
+    errors.push(...validateStructuredCommitmentEnvelope(envelope, { runId, matchId, agentIds, commitmentIds }));
+  }
+
+  for (const event of bundle.publicEvents) {
+    for (const commitmentId of event.linkedCommitmentIds) {
+      if (!commitmentIds.has(commitmentId)) {
+        errors.push(`public event ${event.eventId} references unknown commitment ${commitmentId}`);
+      }
     }
   }
 
@@ -215,6 +225,119 @@ export function validateArtifactBundleConsistency(bundle: ArtifactBundle): strin
     if (!agentIds.has(row.agentId)) {
       errors.push(`final score row references unknown agent ${row.agentId}`);
     }
+  }
+
+  return errors;
+}
+
+function validateStructuredCommitmentEnvelope(
+  envelope: StructuredCommitmentEnvelope,
+  context: {
+    runId: string;
+    matchId: string;
+    agentIds: Set<string>;
+    commitmentIds: Set<string>;
+  },
+): string[] {
+  const errors: string[] = [];
+
+  if (envelope.runId !== context.runId) {
+    errors.push(
+      `commitment envelope ${envelope.envelopeId} has runId ${envelope.runId} but manifest runId is ${context.runId}`,
+    );
+  }
+
+  if (envelope.matchId !== context.matchId) {
+    errors.push(
+      `commitment envelope ${envelope.envelopeId} has matchId ${envelope.matchId} but manifest matchId is ${context.matchId}`,
+    );
+  }
+
+  if (!context.agentIds.has(envelope.agentId)) {
+    errors.push(`commitment envelope ${envelope.envelopeId} references unknown agent ${envelope.agentId}`);
+  }
+
+  if (envelope.status === 'revealed' && !envelope.revealedAt) {
+    errors.push(`commitment envelope ${envelope.envelopeId} is revealed but missing revealedAt`);
+  }
+
+  if (envelope.status === 'revoked' && !envelope.revokedAt) {
+    errors.push(`commitment envelope ${envelope.envelopeId} is revoked but missing revokedAt`);
+  }
+
+  for (const commitment of envelope.commitments) {
+    errors.push(...validateStructuredCommitment(commitment, envelope, context.agentIds, context.commitmentIds));
+  }
+
+  return errors;
+}
+
+function validateStructuredCommitment(
+  commitment: StructuredCommitment,
+  envelope: StructuredCommitmentEnvelope,
+  agentIds: Set<string>,
+  commitmentIds: Set<string>,
+): string[] {
+  const errors: string[] = [];
+
+  if (commitmentIds.has(commitment.commitmentId)) {
+    errors.push(`duplicate commitment id ${commitment.commitmentId}`);
+  } else {
+    commitmentIds.add(commitment.commitmentId);
+  }
+
+  if (commitment.agentId !== envelope.agentId) {
+    errors.push(`commitment ${commitment.commitmentId} agent ${commitment.agentId} does not match envelope ${envelope.envelopeId}`);
+  }
+
+  if (commitment.round !== envelope.round) {
+    errors.push(`commitment ${commitment.commitmentId} round ${commitment.round} does not match envelope ${envelope.envelopeId}`);
+  }
+
+  if (commitment.status !== envelope.status) {
+    errors.push(`commitment ${commitment.commitmentId} status ${commitment.status} does not match envelope ${envelope.envelopeId}`);
+  }
+
+  if (commitment.status === 'revealed' && !commitment.revealedAt) {
+    errors.push(`commitment ${commitment.commitmentId} is revealed but missing revealedAt`);
+  }
+
+  if (commitment.status === 'revoked' && !commitment.revokedAt) {
+    errors.push(`commitment ${commitment.commitmentId} is revoked but missing revokedAt`);
+  }
+
+  switch (commitment.payload.commitmentType) {
+    case 'intended_vote':
+    case 'betrayal_target':
+    case 'nudge':
+      if (!agentIds.has(commitment.payload.targetAgentId)) {
+        errors.push(`commitment ${commitment.commitmentId} targets unknown agent ${commitment.payload.targetAgentId}`);
+      }
+      break;
+    case 'ally_set':
+      for (const allyAgentId of commitment.payload.allyAgentIds) {
+        if (!agentIds.has(allyAgentId)) {
+          errors.push(`commitment ${commitment.commitmentId} references unknown ally ${allyAgentId}`);
+        }
+
+        if (allyAgentId === commitment.agentId) {
+          errors.push(`commitment ${commitment.commitmentId} must not include the committing agent in ally_set`);
+        }
+      }
+      break;
+    case 'task_plan':
+      for (const collaboratorAgentId of commitment.payload.collaboratorAgentIds) {
+        if (!agentIds.has(collaboratorAgentId)) {
+          errors.push(`commitment ${commitment.commitmentId} references unknown collaborator ${collaboratorAgentId}`);
+        }
+
+        if (collaboratorAgentId === commitment.agentId) {
+          errors.push(`commitment ${commitment.commitmentId} must not include the committing agent as a collaborator`);
+        }
+      }
+      break;
+    case 'freeze':
+      break;
   }
 
   return errors;

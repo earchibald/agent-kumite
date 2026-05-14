@@ -10,7 +10,6 @@ import {
   type AlertRecord,
   type ArtifactBundle,
   type AwaitRecord,
-  type CommitmentRef,
   type Condition,
   type FinalScoreRow,
   type InterventionRecord,
@@ -24,6 +23,7 @@ import {
   type RosterEntry,
   type RoundPhase,
   type RunManifest,
+  type StructuredCommitmentEnvelope,
   type TaskOutputRef,
 } from './schema.js';
 import {
@@ -80,7 +80,7 @@ export interface ArtifactBundleInput {
   manifest: RunManifest;
   roster: readonly RosterEntry[];
   publicEvents: readonly PublicEvent[];
-  structuredCommitments?: readonly CommitmentRef[];
+  structuredCommitments?: readonly StructuredCommitmentEnvelope[];
   privateArtifacts?: ArtifactBundle['privateArtifacts'];
   alerts?: readonly AlertRecord[];
   interventions?: readonly InterventionRecord[];
@@ -95,6 +95,11 @@ export interface AwaitDefaultResolution {
   interventionRecord: InterventionRecord;
 }
 
+export interface RevealStructuredCommitmentsResult {
+  state: MatchState;
+  revealedCommitments: StructuredCommitmentEnvelope[];
+}
+
 function cloneScoreMap(input: ScoreMap): ScoreMap {
   return Object.fromEntries(Object.entries(input).map(([agentId, score]) => [agentId, score]));
 }
@@ -107,6 +112,10 @@ function assertValid<T>(errors: string[], message: string): void {
 
 function buildEmptyScores(roster: readonly RosterEntry[]): ScoreMap {
   return Object.fromEntries(roster.map((entry) => [entry.agentId, 0]));
+}
+
+function flattenCommitmentIds(envelopes: readonly StructuredCommitmentEnvelope[]): string[] {
+  return envelopes.flatMap((envelope) => envelope.commitments.map((commitment) => commitment.commitmentId));
 }
 
 function uniqueSortedCursors(cursors: readonly PhaseCursor[]): PhaseCursor[] {
@@ -158,7 +167,7 @@ export function createInitialMatchState(manifest: RunManifest, roster: readonly 
       alertIds: [],
       interventionQueueIds: [],
     },
-    commitmentRefs: [],
+    structuredCommitments: [],
   };
 
   assertValid(validateMatchState(state), 'initial match state is invalid');
@@ -244,6 +253,112 @@ export function spendDmBudget(state: MatchState, agentId: string, amount = 1): M
 
   assertValid(validateMatchState(nextState), 'state after DM spend is invalid');
   return nextState;
+}
+
+export function addStructuredCommitmentEnvelopes(
+  state: MatchState,
+  envelopes: readonly StructuredCommitmentEnvelope[],
+): MatchState {
+  if (envelopes.length === 0) {
+    return state;
+  }
+
+  const seenEnvelopeIds = new Set(state.structuredCommitments.map((envelope) => envelope.envelopeId));
+  const seenCommitmentIds = new Set(flattenCommitmentIds(state.structuredCommitments));
+
+  for (const envelope of envelopes) {
+    if (envelope.runId !== state.runId) {
+      throw new Error(`commitment envelope ${envelope.envelopeId} has runId ${envelope.runId} but state runId is ${state.runId}`);
+    }
+
+    if (envelope.matchId !== state.matchId) {
+      throw new Error(
+        `commitment envelope ${envelope.envelopeId} has matchId ${envelope.matchId} but state matchId is ${state.matchId}`,
+      );
+    }
+
+    if (envelope.round !== state.current.round) {
+      throw new Error(
+        `commitment envelope ${envelope.envelopeId} targets round ${envelope.round} but state is on round ${state.current.round}`,
+      );
+    }
+
+    if (!state.aliveAgentIds.includes(envelope.agentId)) {
+      throw new Error(`commitment envelope ${envelope.envelopeId} references non-alive agent ${envelope.agentId}`);
+    }
+
+    if (envelope.status !== 'sealed') {
+      throw new Error(`commitment envelope ${envelope.envelopeId} must be sealed on submission`);
+    }
+
+    if (seenEnvelopeIds.has(envelope.envelopeId)) {
+      throw new Error(`duplicate commitment envelope id ${envelope.envelopeId}`);
+    }
+
+    for (const commitment of envelope.commitments) {
+      if (commitment.agentId !== envelope.agentId) {
+        throw new Error(`commitment ${commitment.commitmentId} agent ${commitment.agentId} does not match envelope ${envelope.envelopeId}`);
+      }
+
+      if (commitment.round !== envelope.round) {
+        throw new Error(`commitment ${commitment.commitmentId} round ${commitment.round} does not match envelope ${envelope.envelopeId}`);
+      }
+
+      if (commitment.status !== 'sealed') {
+        throw new Error(`commitment ${commitment.commitmentId} must be sealed on submission`);
+      }
+
+      if (seenCommitmentIds.has(commitment.commitmentId)) {
+        throw new Error(`duplicate commitment id ${commitment.commitmentId}`);
+      }
+
+      seenCommitmentIds.add(commitment.commitmentId);
+    }
+
+    seenEnvelopeIds.add(envelope.envelopeId);
+  }
+
+  const nextState: MatchState = {
+    ...state,
+    structuredCommitments: [...state.structuredCommitments, ...envelopes],
+  };
+
+  assertValid(validateMatchState(nextState), 'state after commitment submission is invalid');
+  return nextState;
+}
+
+export function revealStructuredCommitments(
+  state: MatchState,
+  revealedAt: string,
+): RevealStructuredCommitmentsResult {
+  const revealedCommitments: StructuredCommitmentEnvelope[] = [];
+  const nextStructuredCommitments = state.structuredCommitments.map((envelope) => {
+    const shouldReveal = envelope.round === state.current.round && envelope.status === 'sealed';
+    if (!shouldReveal) {
+      return envelope;
+    }
+
+    const revealedEnvelope: StructuredCommitmentEnvelope = {
+      ...envelope,
+      status: 'revealed',
+      revealedAt,
+      commitments: envelope.commitments.map((commitment) => ({
+        ...commitment,
+        status: 'revealed',
+        revealedAt,
+      })),
+    };
+    revealedCommitments.push(revealedEnvelope);
+    return revealedEnvelope;
+  });
+
+  const nextState: MatchState = {
+    ...state,
+    structuredCommitments: nextStructuredCommitments,
+  };
+
+  assertValid(validateMatchState(nextState), 'state after commitment reveal is invalid');
+  return { state: nextState, revealedCommitments };
 }
 
 export function determineElimination(round: number, votes: VoteMap): EliminationResult {
