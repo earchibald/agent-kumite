@@ -4,13 +4,17 @@
   "description": "Core runtime schemas and validation helpers for Agent Kumite.",
   "scripts": {
     "test": "vitest run",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "simulate": "node dist/cli.js"
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
+  },
+  "bin": {
+    "agent-kumite-harness": "./dist/cli.js"
   },
   "type": "module",
   "private": true,
