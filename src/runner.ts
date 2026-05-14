@@ -513,6 +513,8 @@ function buildBenchmarkSummary(
     runId: manifest.runId,
     matchId: manifest.matchId,
     condition: manifest.condition,
+    runSeed: manifest.runSeed,
+    validityStatus: manifest.validityStatus,
     roundsPlayed: finalState.current.round,
     winnerIds: [...finalOutcome.winnerIds],
     eliminatedAgentIds: [...finalState.eliminatedAgentIds],

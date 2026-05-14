@@ -107,6 +107,8 @@
     "runId": "run_c5_seed_0001",
     "matchId": "match_seed_0001",
     "condition": "C5",
+    "runSeed": 1,
+    "validityStatus": "valid",
     "roundsPlayed": 3,
     "winnerIds": [],
     "eliminatedAgentIds": [],

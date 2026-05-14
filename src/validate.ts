@@ -160,6 +160,16 @@ export function validateArtifactBundleConsistency(bundle: ArtifactBundle): strin
     );
   }
 
+  if (bundle.benchmarkSummary.runSeed !== bundle.manifest.runSeed) {
+    errors.push(`benchmark summary runSeed ${bundle.benchmarkSummary.runSeed} does not match manifest runSeed ${bundle.manifest.runSeed}`);
+  }
+
+  if (bundle.benchmarkSummary.validityStatus !== bundle.manifest.validityStatus) {
+    errors.push(
+      `benchmark summary validityStatus ${bundle.benchmarkSummary.validityStatus} does not match manifest validityStatus ${bundle.manifest.validityStatus}`,
+    );
+  }
+
   if (bundle.replayBundle.runId !== runId) {
     errors.push(`replay bundle runId ${bundle.replayBundle.runId} does not match manifest runId ${runId}`);
   }

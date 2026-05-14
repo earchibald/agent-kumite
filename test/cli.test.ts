@@ -19,7 +19,7 @@ describe('local harness CLI', () => {
     const dir = await mkdtemp(join(tmpdir(), 'agent-kumite-cli-'));
     const outputPath = join(dir, 'artifacts.json');
     const result = await runHarnessFromFile({
-      inputPath: join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-25', 'fixtures/demo-match.input.json'),
+      inputPath: join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-26', 'fixtures/demo-match.input.json'),
       outputPath,
       pretty: true,
     });

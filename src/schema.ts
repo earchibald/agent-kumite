@@ -595,6 +595,8 @@ export const BenchmarkSummarySchema = Type.Object(
     runId: IdSchema,
     matchId: IdSchema,
     condition: ConditionSchema,
+    runSeed: Type.Integer({ minimum: 0 }),
+    validityStatus: ValidityStatusSchema,
     roundsPlayed: Type.Integer({ minimum: 1, maximum: 5 }),
     winnerIds: Type.Array(IdSchema, { uniqueItems: true }),
     eliminatedAgentIds: Type.Array(IdSchema, { uniqueItems: true }),
