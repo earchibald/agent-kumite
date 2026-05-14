@@ -36,18 +36,23 @@ That makes Swift the place where phase 1's dense operator work belongs:
 
 ## Screen shell and navigation contract
 
-The app shell is locked to a `NavigationSplitView`-style structure: a leading destination column, a primary content column, and a detail/inspector column.[^swift-navsplit] This is not a mere layout preference; it encodes the operating model:
+The app shell is locked to a **two-column** `NavigationSplitView` plus an inspector.[^swift-navsplit][^swift-inspector] This is not a mere layout preference; it encodes the operating model:
 
 - **Leading column** selects the active destination (`home`, `callsheet`, `liveOps`, `replayLab`, `aftermathLedger`) and the current run.
 - **Primary column** renders the selected screen's main table, timeline, or workspace.
-- **Detail / inspector column** renders private-state drill-down, `awaiting` payload detail, replay detail, and record inspection without changing the primary screen.
+- **Inspector** is the trailing drill-down surface for private-state detail, `awaiting` payloads, replay detail, and record inspection. In horizontally regular layouts it behaves like a trailing column; in compact layouts it adapts to a sheet rather than remaining simultaneously visible beside the primary content.[^swift-inspector]
 
 Two supporting SwiftUI primitives are binding:
 
-1. **`Table` is the canonical dense roster / ledger surface.** Cast callsheet and aftermath ledger are multi-column, sortable, selectable views over structured rows; they are not free-form card mosaics by default.[^swift-table]
-2. **`inspector(isPresented:content:)` is the canonical drill-down surface.** Private-state detail, trace inspection, and `awaiting` resolution payloads live in the inspector and may adapt to a sheet in compact size classes without changing their semantics.[^swift-inspector]
+1. **`Table` is the canonical dense roster / ledger surface.** Cast callsheet and aftermath ledger are multi-column, selectable views over structured rows; they are not free-form card mosaics by default.[^swift-table]
+2. **`inspector(isPresented:content:)` is the canonical drill-down surface.** Private-state detail, trace inspection, and `awaiting` resolution payloads live in the inspector. In compact size classes the inspector may adapt to a sheet, which means drill-down remains available but no longer stays visible alongside the primary timeline.[^swift-inspector]
 
-Compact collapse behavior follows `NavigationSplitView` rules: when the view collapses to a stack, Swift must preserve the currently meaningful screen rather than dropping the operator back to an empty shell.[^swift-navsplit] The product remains desktop-first, but the shell must degrade predictably.
+Two implementation obligations follow from the cited APIs:
+
+1. **Compact focus is explicit state, not an automatic guarantee.** `NavigationSplitView` chooses the compact stack's top column unless the app tracks and updates `preferredCompactColumn`; Swift must therefore keep the operator's current focus in shell state and drive compact collapse intentionally rather than assuming the API preserves the right screen automatically.[^swift-navsplit]
+2. **Compact table fallback is real.** In compact horizontal layouts, `Table` can hide headers and collapse to its first column, so the first column of callsheet and ledger tables must carry the canonical identity and highest-value summary for the row.[^swift-table]
+
+The product remains desktop-first. Regular/horizontally expanded layouts are where simultaneous live-ops visibility guarantees apply; compact layouts preserve reachability, not full side-by-side density.
 
 ## MVP screens
 
@@ -57,7 +62,7 @@ The phase-1 screen set is fixed at five destinations:
 | :--- | :--- | :--- | :--- | :--- |
 | **Arena Control Room home** | Match directory and launchpad into live or replay work | Run manifest (#1), roster summary (#3), alert counts, open `awaiting` counts, latest markers | Summary cards plus alert/queue counts | Select active run, jump to live-ops, jump to replay marker, open latest aftermath |
 | **Cast callsheet** | Dense roster view for one run | Roster (#3), life state, role, score deltas (#10), current alliance/commitment summaries (#5), alert badges | Public summary + selected private detail in inspector | Sort, filter, multi-select, inspect one agent's DMs/trace/commitments |
-| **Live-ops** | Operate an active run without mixing layers | Public events (#4), private artifacts (#5–#7), open `awaiting` items (#9 + AK-12), alerts, scores (#10) | All four AK-13 layers, visibly separated | Watch timeline, inspect private state, acknowledge alerts, resolve `awaiting` in C5 |
+| **Live-ops** | Operate an active run without mixing layers | Public events (#4), private artifacts (#5–#7), open `awaiting` items (#9 + AK-12), alerts, scores (#10) | All four AK-13 layers, with simultaneous visibility required in regular layouts | Watch timeline, inspect private state, acknowledge alerts, resolve `awaiting` in C5 |
 | **Replay lab** | Phase/event scrub, compare, recap, and bookmark | Replay bundle (#2), full artifacts (#4–#10), snapshots, markers | Historical projections of the same four layers | Scrub by round/phase/event, jump to marker, diff snapshots, inspect historical payloads |
 | **Aftermath ledger** | Post-match summary, scoring, betrayal, and operator-action review | Final scores (#10), commitments (#5), task outputs (#8), interventions (#9), marker rollups | Summaries first, drill-down second | Sort rows, pivot between score / betrayal / intervention reads, jump to replay proof |
 
@@ -93,7 +98,7 @@ Each row must carry at least:
 - current round commitment status;
 - current alert / `awaiting` badges.
 
-The primary view is a `Table` so operators can sort by score, role, badge, alert status, or survival state.[^swift-table] Selecting a row opens the inspector with private-state detail, including DMs, commitment history, divergence clues, and labeled `reported_reasoning` if present. The callsheet never inlines raw private payload into the main table.
+The primary view is a `Table` so operators can sort by score, role, badge, alert status, or survival state.[^swift-table] The first column must carry the row's canonical identity plus enough status to survive compact-column collapse. Selecting a row opens the inspector with private-state detail, including DMs, commitment history, divergence clues, and labeled `reported_reasoning` if present. The callsheet never inlines raw private payload into the main table.
 
 ### Live-ops
 
@@ -141,11 +146,13 @@ The layer split is inherited from AK-13 and is non-negotiable.[^layered-ui] What
 
 | Active-agent count | Callsheet density | Live-ops density | Replay / aftermath density |
 | :--- | :--- | :--- | :--- |
-| **`<= 8`** | Full-fidelity rows or cards may show badge, role, life state, score, and alert badges simultaneously. This is the phase-1 happy path because v0 runs only six agents.[^match-spec] | Public stream, alert rail, intervention queue, and one inspector may remain visible together. | Per-agent rows and per-event markers may all stay visible at once. |
+| **`<= 8`** | Full-fidelity rows or cards may show badge, role, life state, score, and alert badges simultaneously. This is the phase-1 happy path because v0 runs only six agents.[^match-spec] | In regular horizontal layouts, public stream, alert rail, intervention queue, and one inspector may remain visible together. | Per-agent rows and per-event markers may all stay visible at once. |
 | **`9-20`** | Table-first. Only one selected row may expand into rich detail; secondary badges compress to chips. | One primary timeline plus collapsible side panels. Alerts and queue items batch by concern rather than rendering one always-open panel per agent. | Replay defaults to grouped markers and one selected-agent drill-down; aftermath defaults to sortable summary rows. |
 | **`> 20`** | Search / filter / grouping first. Simultaneous full-cast detail is forbidden; operators select cohorts or one agent at a time. | Aggregate counters, incident clusters, and top-N attention lists replace full simultaneous roster visibility. Private detail is always on-demand. | Replay and aftermath default to cohorts, histograms, and grouped incidents; per-agent detail is entered explicitly. |
 
 These three bands are locked. Styling may change, but the threshold boundaries may not silently drift. The reason is operational, not aesthetic: once density crosses the `<= 8` band, the UI must stop pretending it can show everything at once and force explicit selection.
+
+These bands do **not** override size-class behavior. Compact horizontal layouts are an orthogonal fallback: tables may collapse to their first column and the inspector may present as a sheet, so the phase-1 guarantee there is that every layer remains reachable with stable semantics and ids, not that all live surfaces remain concurrently visible.
 
 ## Canonical state model
 
@@ -157,7 +164,8 @@ Swift owns one canonical control-room state graph per run, plus one global shell
     "selectedScreen": "liveOps",
     "selectedRunID": "run_456",
     "selectedAgentIDs": ["saboteur-1"],
-    "inspectorSelection": null
+    "inspectorSelection": null,
+    "preferredCompactColumn": "content"
   },
   "runs": {
     "run_456": {
@@ -184,17 +192,17 @@ The persisted and derived record types are locked as follows:
 | :--- | :--- | :--- | :--- |
 | `RunManifest` | persisted | Artifact #1 | Names the run, condition, seed, revision, validity, and config. |
 | `RosterEntry` | persisted | Artifact #3 | Stable agent identity, role, model badge, seat, and memory setting. |
-| `PublicEvent` | persisted | Artifacts #2 and #4 | Phase-ordered public chronology and visible beats. |
+| `PublicEvent` | persisted | Artifact #4 (ordered in Artifact #2) | Phase-ordered public chronology and visible beats. |
 | `PrivateArtifact` | persisted | Artifacts #5, #6, #7 | Commitments, DMs, privileged reads, trace slices, referee diagnostics. |
 | `AwaitRecord` | persisted | Artifact #9 + AK-12 payload | Canonical human-oversight object keyed by `await_id`; never surface-local. |
 | `AlertRecord` | derived-but-persistable | Source-layer state transitions | Sparse attention object that points back to its source record. |
-| `ReplaySnapshot` | persisted | Replay contract below | Fast reconstruction checkpoints for scrub and diff. |
-| `ReplayMarker` | persisted | Replay contract below | Named jump points for recap, alert review, and proof links. |
-| `AftermathRow` | derived | Artifacts #5, #8, #9, #10 | Post-match ledger rows for score, betrayal, task, and intervention review. |
+| `ReplaySnapshot` | persisted | Artifact #2 replay bundle | Fast reconstruction checkpoints for scrub and diff. |
+| `ReplayMarker` | persisted | Artifact #2 replay bundle | Named jump points for recap, alert review, and proof links. |
+| `AftermathRow` | derived | Artifacts #4, #5, #6, #8, #9, #10 | Post-match ledger rows for score, betrayal, task, survival, and intervention review. |
 
 Two invariants govern the whole model:
 
-1. **Artifacts stay authoritative.** If a view needs data that cannot be traced back to artifacts #1-#10 or a replay snapshot/marker derived from them, it is not benchmark-grade state.[^benchmark]
+1. **Artifacts stay authoritative.** If a view needs data that cannot be traced back to artifacts #1-#10, it is not benchmark-grade state. Replay snapshots and markers are part of Artifact #2, not a Swift-only side store.[^benchmark]
 2. **Derived projections are never the only home of a fact.** Callsheet rows, alert cards, queue summaries, and aftermath rows are projections. Their source record remains authoritative and linkable.
 
 ## ACP ingestion strategy
@@ -213,7 +221,7 @@ The control room must tolerate multi-session matches explicitly. Per the thesis,
 
 ## Replay persistence, snapshot cadence, scrub, and markers
 
-Replay is a persistence contract, not just a UI feature. The run must remain reconstructible from the replay bundle and artifact store.[^benchmark]
+Replay is a persistence contract, not just a UI feature. Artifact #2 is the replay bundle: ordered timeline indexing plus persisted snapshots and markers sufficient to reconstruct the run together with the rest of the artifact store.[^benchmark]
 
 ### Snapshot cadence
 
