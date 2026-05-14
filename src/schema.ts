@@ -1,0 +1,489 @@
+import { Static, Type } from '@sinclair/typebox';
+
+const IdSchema = Type.String({
+  minLength: 1,
+  pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
+});
+
+const TimestampSchema = Type.String({
+  pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$',
+});
+const MetadataSchema = Type.Record(Type.String(), Type.Unknown());
+
+export const ConditionSchema = Type.Union(
+  [
+    Type.Literal('C1'),
+    Type.Literal('C2'),
+    Type.Literal('C3'),
+    Type.Literal('C4'),
+    Type.Literal('C4*'),
+    Type.Literal('C5'),
+  ],
+  { $id: 'Condition' },
+);
+export type Condition = Static<typeof ConditionSchema>;
+
+export const OperatorAffordanceSetSchema = Type.Union(
+  [Type.Literal('observation-only'), Type.Literal('intervention-enabled')],
+  { $id: 'OperatorAffordanceSet' },
+);
+export type OperatorAffordanceSet = Static<typeof OperatorAffordanceSetSchema>;
+
+export const RosterModeSchema = Type.Union([Type.Literal('same-model'), Type.Literal('mixed-model')], {
+  $id: 'RosterMode',
+});
+export type RosterMode = Static<typeof RosterModeSchema>;
+
+export const MemoryModeSchema = Type.Union([Type.Literal('off'), Type.Literal('on')], {
+  $id: 'MemoryMode',
+});
+export type MemoryMode = Static<typeof MemoryModeSchema>;
+
+export const MatchRoleSchema = Type.Union(
+  [Type.Literal('contender'), Type.Literal('analyst'), Type.Literal('saboteur')],
+  { $id: 'MatchRole' },
+);
+export type MatchRole = Static<typeof MatchRoleSchema>;
+
+export const RoundPhaseSchema = Type.Union(
+  [
+    Type.Literal('cast_intro'),
+    Type.Literal('private_negotiation'),
+    Type.Literal('structured_commitment_submission'),
+    Type.Literal('public_square'),
+    Type.Literal('task_submission'),
+    Type.Literal('simultaneous_reveal'),
+    Type.Literal('resolution_pressure_escalation'),
+    Type.Literal('elimination_aftermath'),
+    Type.Literal('task_scoring_debrief'),
+  ],
+  { $id: 'RoundPhase' },
+);
+export type RoundPhase = Static<typeof RoundPhaseSchema>;
+
+export const ROUND_PHASE_ORDER: readonly RoundPhase[] = [
+  'cast_intro',
+  'private_negotiation',
+  'structured_commitment_submission',
+  'public_square',
+  'task_submission',
+  'simultaneous_reveal',
+  'resolution_pressure_escalation',
+  'elimination_aftermath',
+  'task_scoring_debrief',
+];
+
+export const SurfaceLayerSchema = Type.Union(
+  [
+    Type.Literal('public'),
+    Type.Literal('private'),
+    Type.Literal('alert'),
+    Type.Literal('intervention'),
+  ],
+  { $id: 'SurfaceLayer' },
+);
+export type SurfaceLayer = Static<typeof SurfaceLayerSchema>;
+
+export const AwaitKindSchema = Type.Union(
+  [
+    Type.Literal('question'),
+    Type.Literal('nudge'),
+    Type.Literal('approval'),
+    Type.Literal('role_change'),
+    Type.Literal('freeze'),
+    Type.Literal('ejection'),
+  ],
+  { $id: 'AwaitKind' },
+);
+export type AwaitKind = Static<typeof AwaitKindSchema>;
+
+export const AwaitStatusSchema = Type.Union(
+  [
+    Type.Literal('pending'),
+    Type.Literal('resolved'),
+    Type.Literal('timed_out'),
+    Type.Literal('superseded'),
+  ],
+  { $id: 'AwaitStatus' },
+);
+export type AwaitStatus = Static<typeof AwaitStatusSchema>;
+
+export const MatchStatusSchema = Type.Union(
+  [Type.Literal('setup'), Type.Literal('live'), Type.Literal('paused'), Type.Literal('completed')],
+  { $id: 'MatchStatus' },
+);
+export type MatchStatus = Static<typeof MatchStatusSchema>;
+
+export const PublicEventKindSchema = Type.Union(
+  [
+    Type.Literal('round_open'),
+    Type.Literal('public_utterance'),
+    Type.Literal('nomination'),
+    Type.Literal('vote_reveal'),
+    Type.Literal('commitment_reveal'),
+    Type.Literal('elimination'),
+    Type.Literal('score_delta'),
+    Type.Literal('phase_transition'),
+    Type.Literal('replay_marker'),
+  ],
+  { $id: 'PublicEventKind' },
+);
+export type PublicEventKind = Static<typeof PublicEventKindSchema>;
+
+export const CommitmentTypeSchema = Type.Union(
+  [
+    Type.Literal('intended_vote'),
+    Type.Literal('ally_set'),
+    Type.Literal('betrayal_target'),
+    Type.Literal('task_plan'),
+    Type.Literal('freeze'),
+    Type.Literal('nudge'),
+  ],
+  { $id: 'CommitmentType' },
+);
+export type CommitmentType = Static<typeof CommitmentTypeSchema>;
+
+export const PrivateArtifactKindSchema = Type.Union(
+  [
+    Type.Literal('dm'),
+    Type.Literal('analyst_privileged_read'),
+    Type.Literal('aftermath_note'),
+    Type.Literal('reported_reasoning'),
+  ],
+  { $id: 'PrivateArtifactKind' },
+);
+export type PrivateArtifactKind = Static<typeof PrivateArtifactKindSchema>;
+
+export const MarkerTypeSchema = Type.Union(
+  [
+    Type.Literal('reveal'),
+    Type.Literal('elimination'),
+    Type.Literal('betrayal'),
+    Type.Literal('alert'),
+    Type.Literal('await_open'),
+    Type.Literal('await_resolved'),
+    Type.Literal('bookmark'),
+  ],
+  { $id: 'MarkerType' },
+);
+export type MarkerType = Static<typeof MarkerTypeSchema>;
+
+export const ValidityStatusSchema = Type.Union(
+  [Type.Literal('valid'), Type.Literal('invalid'), Type.Literal('contaminated')],
+  { $id: 'ValidityStatus' },
+);
+export type ValidityStatus = Static<typeof ValidityStatusSchema>;
+
+export const AlertSeveritySchema = Type.Union(
+  [Type.Literal('info'), Type.Literal('warning'), Type.Literal('critical')],
+  { $id: 'AlertSeverity' },
+);
+export type AlertSeverity = Static<typeof AlertSeveritySchema>;
+
+export const AlertStatusSchema = Type.Union(
+  [Type.Literal('active'), Type.Literal('acknowledged'), Type.Literal('resolved')],
+  { $id: 'AlertStatus' },
+);
+export type AlertStatus = Static<typeof AlertStatusSchema>;
+
+export const PhaseCursorSchema = Type.Object(
+  {
+    round: Type.Integer({ minimum: 1, maximum: 5 }),
+    phase: RoundPhaseSchema,
+  },
+  { $id: 'PhaseCursor' },
+);
+export type PhaseCursor = Static<typeof PhaseCursorSchema>;
+
+export const RunManifestSchema = Type.Object(
+  {
+    runId: IdSchema,
+    matchId: IdSchema,
+    condition: ConditionSchema,
+    runSeed: Type.Integer({ minimum: 0 }),
+    rosterMode: RosterModeSchema,
+    memoryMode: MemoryModeSchema,
+    operatorAffordanceSet: OperatorAffordanceSetSchema,
+    codeRevision: Type.String({ minLength: 7 }),
+    validityStatus: ValidityStatusSchema,
+    invalidationReason: Type.Optional(Type.String({ minLength: 1 })),
+  },
+  { $id: 'RunManifest' },
+);
+export type RunManifest = Static<typeof RunManifestSchema>;
+
+export const RosterEntrySchema = Type.Object(
+  {
+    agentId: IdSchema,
+    displayName: Type.String({ minLength: 1 }),
+    seat: Type.Integer({ minimum: 1, maximum: 6 }),
+    role: MatchRoleSchema,
+    modelFamily: Type.String({ minLength: 1 }),
+    modelVersion: Type.String({ minLength: 1 }),
+    memoryEnabled: Type.Boolean(),
+  },
+  { $id: 'RosterEntry' },
+);
+export type RosterEntry = Static<typeof RosterEntrySchema>;
+
+export const CommitmentRefSchema = Type.Object(
+  {
+    commitmentId: IdSchema,
+    agentId: IdSchema,
+    round: Type.Integer({ minimum: 1, maximum: 5 }),
+    commitmentType: CommitmentTypeSchema,
+    artifactNumber: Type.Literal(5),
+    status: Type.Union([Type.Literal('sealed'), Type.Literal('revealed'), Type.Literal('revoked')]),
+  },
+  { $id: 'CommitmentRef' },
+);
+export type CommitmentRef = Static<typeof CommitmentRefSchema>;
+
+export const LayerCollectionsSchema = Type.Object(
+  {
+    publicEventIds: Type.Array(IdSchema),
+    privateArtifactIds: Type.Array(IdSchema),
+    alertIds: Type.Array(IdSchema),
+    interventionQueueIds: Type.Array(IdSchema),
+  },
+  { $id: 'LayerCollections' },
+);
+export type LayerCollections = Static<typeof LayerCollectionsSchema>;
+
+export const MatchStateSchema = Type.Object(
+  {
+    runId: IdSchema,
+    matchId: IdSchema,
+    condition: ConditionSchema,
+    status: MatchStatusSchema,
+    current: PhaseCursorSchema,
+    aliveAgentIds: Type.Array(IdSchema, { minItems: 1, maxItems: 6, uniqueItems: true }),
+    eliminatedAgentIds: Type.Array(IdSchema, { maxItems: 5, uniqueItems: true }),
+    dmBudgetByAgent: Type.Record(IdSchema, Type.Integer({ minimum: 0, maximum: 5 })),
+    scoreByAgent: Type.Record(IdSchema, Type.Integer()),
+    openAwaitIds: Type.Array(IdSchema, { uniqueItems: true }),
+    layers: LayerCollectionsSchema,
+    commitmentRefs: Type.Array(CommitmentRefSchema),
+  },
+  { $id: 'MatchState' },
+);
+export type MatchState = Static<typeof MatchStateSchema>;
+
+export const PublicEventSchema = Type.Object(
+  {
+    eventId: IdSchema,
+    runId: IdSchema,
+    matchId: IdSchema,
+    cursor: PhaseCursorSchema,
+    timestamp: TimestampSchema,
+    kind: PublicEventKindSchema,
+    layer: Type.Literal('public'),
+    actorAgentIds: Type.Array(IdSchema, { uniqueItems: true }),
+    linkedCommitmentIds: Type.Array(IdSchema, { uniqueItems: true }),
+    payload: MetadataSchema,
+  },
+  { $id: 'PublicEvent' },
+);
+export type PublicEvent = Static<typeof PublicEventSchema>;
+
+export const PrivateArtifactRefSchema = Type.Object(
+  {
+    artifactId: IdSchema,
+    runId: IdSchema,
+    agentId: IdSchema,
+    kind: PrivateArtifactKindSchema,
+    timestamp: TimestampSchema,
+    linkedEventIds: Type.Array(IdSchema, { uniqueItems: true }),
+  },
+  { $id: 'PrivateArtifactRef' },
+);
+export type PrivateArtifactRef = Static<typeof PrivateArtifactRefSchema>;
+
+export const AlertRecordSchema = Type.Object(
+  {
+    alertId: IdSchema,
+    runId: IdSchema,
+    cursor: PhaseCursorSchema,
+    layer: Type.Literal('alert'),
+    sourceLayer: SurfaceLayerSchema,
+    severity: AlertSeveritySchema,
+    status: AlertStatusSchema,
+    message: Type.String({ minLength: 1 }),
+    sourceRecordIds: Type.Array(IdSchema, { minItems: 1, uniqueItems: true }),
+  },
+  { $id: 'AlertRecord' },
+);
+export type AlertRecord = Static<typeof AlertRecordSchema>;
+
+export const AwaitScopeSchema = Type.Object(
+  {
+    matchId: IdSchema,
+    runId: IdSchema,
+    round: Type.Integer({ minimum: 1, maximum: 5 }),
+    phase: RoundPhaseSchema,
+    targetAgentIds: Type.Array(IdSchema, { uniqueItems: true }),
+  },
+  { $id: 'AwaitScope' },
+);
+export type AwaitScope = Static<typeof AwaitScopeSchema>;
+
+export const AwaitChoiceSchema = Type.Object(
+  {
+    choiceId: Type.String({ minLength: 1 }),
+    label: Type.String({ minLength: 1 }),
+    inputSchema: Type.Optional(MetadataSchema),
+  },
+  { $id: 'AwaitChoice' },
+);
+export type AwaitChoice = Static<typeof AwaitChoiceSchema>;
+
+export const AwaitRecordSchema = Type.Object(
+  {
+    awaitId: IdSchema,
+    kind: AwaitKindSchema,
+    layer: Type.Literal('intervention'),
+    status: AwaitStatusSchema,
+    scope: AwaitScopeSchema,
+    prompt: Type.String({ minLength: 1 }),
+    details: Type.Object({
+      summary: Type.String({ minLength: 1 }),
+      proposedEffect: Type.String({ minLength: 1 }),
+      artifacts: Type.Array(IdSchema),
+      context: MetadataSchema,
+    }),
+    choices: Type.Array(AwaitChoiceSchema, { minItems: 1 }),
+    defaultChoice: Type.Optional(Type.String({ minLength: 1 })),
+    openedAt: TimestampSchema,
+    openedBy: Type.String({ minLength: 1 }),
+    idempotencyKey: Type.String({ minLength: 1 }),
+  },
+  { $id: 'AwaitRecord' },
+);
+export type AwaitRecord = Static<typeof AwaitRecordSchema>;
+
+export const InterventionRecordSchema = Type.Object(
+  {
+    interventionId: IdSchema,
+    runId: IdSchema,
+    cursor: PhaseCursorSchema,
+    layer: Type.Literal('intervention'),
+    awaitId: IdSchema,
+    kind: AwaitKindSchema,
+    status: AwaitStatusSchema,
+    choiceId: Type.Optional(Type.String({ minLength: 1 })),
+    operatorId: Type.Optional(Type.String({ minLength: 1 })),
+    openedAt: TimestampSchema,
+    resolvedAt: Type.Optional(TimestampSchema),
+  },
+  { $id: 'InterventionRecord' },
+);
+export type InterventionRecord = Static<typeof InterventionRecordSchema>;
+
+export const ReplayStateSchema = Type.Object(
+  {
+    cursor: PhaseCursorSchema,
+    aliveAgentIds: Type.Array(IdSchema, { minItems: 1, maxItems: 6, uniqueItems: true }),
+    eliminatedAgentIds: Type.Array(IdSchema, { maxItems: 5, uniqueItems: true }),
+    scoreByAgent: Type.Record(IdSchema, Type.Integer()),
+    openAwaitIds: Type.Array(IdSchema, { uniqueItems: true }),
+  },
+  { $id: 'ReplayState' },
+);
+export type ReplayState = Static<typeof ReplayStateSchema>;
+
+export const ReplaySnapshotSchema = Type.Object(
+  {
+    snapshotId: IdSchema,
+    runId: IdSchema,
+    cursor: PhaseCursorSchema,
+    capturedAt: TimestampSchema,
+    state: ReplayStateSchema,
+  },
+  { $id: 'ReplaySnapshot' },
+);
+export type ReplaySnapshot = Static<typeof ReplaySnapshotSchema>;
+
+export const ReplayMarkerSchema = Type.Object(
+  {
+    markerId: IdSchema,
+    runId: IdSchema,
+    cursor: PhaseCursorSchema,
+    markerType: MarkerTypeSchema,
+    label: Type.String({ minLength: 1 }),
+    sourceEventIds: Type.Array(IdSchema, { uniqueItems: true }),
+    linkedAwaitId: Type.Optional(IdSchema),
+  },
+  { $id: 'ReplayMarker' },
+);
+export type ReplayMarker = Static<typeof ReplayMarkerSchema>;
+
+export const ReplayBundleSchema = Type.Object(
+  {
+    runId: IdSchema,
+    timeline: Type.Array(PhaseCursorSchema, { minItems: 1 }),
+    snapshots: Type.Array(ReplaySnapshotSchema),
+    markers: Type.Array(ReplayMarkerSchema),
+  },
+  { $id: 'ReplayBundle' },
+);
+export type ReplayBundle = Static<typeof ReplayBundleSchema>;
+
+export const TaskOutputRefSchema = Type.Object(
+  {
+    submissionId: IdSchema,
+    runId: IdSchema,
+    agentId: IdSchema,
+    round: Type.Integer({ minimum: 1, maximum: 5 }),
+    rubricId: IdSchema,
+    finalScore: Type.Integer({ minimum: 0, maximum: 3 }),
+  },
+  { $id: 'TaskOutputRef' },
+);
+export type TaskOutputRef = Static<typeof TaskOutputRefSchema>;
+
+export const FinalScoreRowSchema = Type.Object(
+  {
+    agentId: IdSchema,
+    roundDeltas: Type.Array(Type.Integer(), { minItems: 1, maxItems: 5 }),
+    total: Type.Integer(),
+    winnerShare: Type.Number({ minimum: 0, maximum: 1 }),
+  },
+  { $id: 'FinalScoreRow' },
+);
+export type FinalScoreRow = Static<typeof FinalScoreRowSchema>;
+
+export const ArtifactBundleSchema = Type.Object(
+  {
+    manifest: RunManifestSchema,
+    replayBundle: ReplayBundleSchema,
+    roster: Type.Array(RosterEntrySchema, { minItems: 6, maxItems: 6 }),
+    publicEvents: Type.Array(PublicEventSchema),
+    structuredCommitments: Type.Array(CommitmentRefSchema),
+    privateArtifacts: Type.Array(PrivateArtifactRefSchema),
+    alerts: Type.Array(AlertRecordSchema),
+    interventions: Type.Array(InterventionRecordSchema),
+    taskOutputs: Type.Array(TaskOutputRefSchema),
+    finalScores: Type.Array(FinalScoreRowSchema, { minItems: 1, maxItems: 6 }),
+  },
+  { $id: 'ArtifactBundle' },
+);
+export type ArtifactBundle = Static<typeof ArtifactBundleSchema>;
+
+export const RuntimeSchemas = {
+  AlertRecordSchema,
+  ArtifactBundleSchema,
+  AwaitRecordSchema,
+  CommitmentRefSchema,
+  ConditionSchema,
+  FinalScoreRowSchema,
+  InterventionRecordSchema,
+  MatchStateSchema,
+  PhaseCursorSchema,
+  PublicEventSchema,
+  ReplayBundleSchema,
+  ReplayMarkerSchema,
+  ReplaySnapshotSchema,
+  RosterEntrySchema,
+  RunManifestSchema,
+  TaskOutputRefSchema,
+} as const;

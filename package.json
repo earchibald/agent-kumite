@@ -1,0 +1,25 @@
+{
+  "name": "@agent-kumite/core",
+  "version": "0.0.0",
+  "description": "Core runtime schemas and validation helpers for Agent Kumite.",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.49"
+  },
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
+  }
+}
