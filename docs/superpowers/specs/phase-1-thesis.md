@@ -105,7 +105,7 @@ If (6) holds in particular, presentation is no longer downstream of the data mod
 | Observation vs intervention separation | REC-08, AK-3, `docs/superpowers/specs/observation-vs-intervention.md` |
 | Thought-trace labeling | REC-07, AK-4, `docs/superpowers/specs/thought-trace-labeling.md` |
 | Roster identity / cast / model badges | REC-13, AK-10 |
-| Pressure shell / tension director | REC-14, AK-11 |
+| Pressure shell / tension director | REC-14, AK-11, `docs/superpowers/specs/tension-director.md` |
 | Swift control room | REC-09, AK-14 |
 | Discord RBAC and audit | REC-10, AK-15 |
 | ACP client / orchestration layer / multi-session match mapping | FOLLOWUPS "Architecture and implementation" 1–4, 8 |

@@ -144,7 +144,7 @@ The numbers are deliberately small: the score formula is meant to be legible at 
 | Structured commitment schema (intended vote, ally set, target, task plan) | REC-04, AK-7 |
 | Cast identity (display names, model badges, motifs, rivalry history) | REC-13, AK-10 |
 | Task corpus contents and rubrics | REC-06, AK-9 |
-| Pressure shell / tension director (broadcast cues, soundtrack from match state) | REC-14, AK-11 |
+| Pressure shell / tension director (broadcast cues, soundtrack from match state) | REC-14, AK-11, `docs/superpowers/specs/tension-director.md` |
 | Referee grimoire (operator god-view, hidden state separation) | REC-05, AK-8 |
 | Observation vs intervention separation | REC-08, AK-3, `docs/superpowers/specs/observation-vs-intervention.md` |
 | Thought-trace labeling | REC-07, AK-4, `docs/superpowers/specs/thought-trace-labeling.md` |
@@ -156,7 +156,7 @@ The numbers are deliberately small: the score formula is meant to be legible at 
 - `Agent Kumite.md` §4 v0 match spec table — preserved in [Match shape](#match-shape); this spec is canonical.
 - `Agent Kumite.md` §4 round loop — preserved in [Round loop](#round-loop); this spec is canonical and adds the closed/open phase distinction.
 - `Agent Kumite.md` §4 v0 score formula — preserved in [Score formula](#score-formula); this spec is canonical and locks the Analyst / Saboteur adjustments concretely.
-- `Agent Kumite.md` §4 "design decisions that matter immediately" — the task-layer, pressure-shell, and elimination-aftermath decisions are operationalised here; the cast and adaptive-soundtrack decisions remain in their owning issues (AK-10, AK-11).
+- `Agent Kumite.md` §4 "design decisions that matter immediately" — the task-layer, pressure-shell, and elimination-aftermath decisions are operationalised here; cast identity remains in AK-10 and the adaptive-soundtrack / tension layer now lives in `docs/superpowers/specs/tension-director.md` (AK-11).
 - `phase-1-thesis.md` `Out of scope, with pointers` row "v0 match spec" — answered by this spec.
 
 If a future change updates the v0 rules, it updates this spec first. Other artifacts are downstream.
