@@ -23,6 +23,8 @@ import {
   type RosterEntry,
   type RoundPhase,
   type RunManifest,
+  type CommitmentDivergenceRecord,
+  type SpeechCommitmentLinkRecord,
   type StructuredCommitmentEnvelope,
   type TaskOutputRef,
 } from './schema.js';
@@ -82,6 +84,8 @@ export interface ArtifactBundleInput {
   publicEvents: readonly PublicEvent[];
   structuredCommitments?: readonly StructuredCommitmentEnvelope[];
   privateArtifacts?: ArtifactBundle['privateArtifacts'];
+  speechCommitmentLinks?: readonly SpeechCommitmentLinkRecord[];
+  commitmentDivergences?: readonly CommitmentDivergenceRecord[];
   alerts?: readonly AlertRecord[];
   interventions?: readonly InterventionRecord[];
   taskOutputs?: readonly TaskOutputRef[];
@@ -582,6 +586,8 @@ export function createArtifactBundle(input: ArtifactBundleInput): ArtifactBundle
     publicEvents: [...input.publicEvents],
     structuredCommitments: [...(input.structuredCommitments ?? [])],
     privateArtifacts: [...(input.privateArtifacts ?? [])],
+    speechCommitmentLinks: [...(input.speechCommitmentLinks ?? [])],
+    commitmentDivergences: [...(input.commitmentDivergences ?? [])],
     alerts: [...(input.alerts ?? [])],
     interventions: [...(input.interventions ?? [])],
     taskOutputs: [...(input.taskOutputs ?? [])],

@@ -17,13 +17,19 @@ import type {
   AlertRecord,
   ArtifactBundle,
   AwaitRecord,
+  CommitmentClaim,
+  CommitmentDivergenceRecord,
   InterventionRecord,
   MatchState,
+  PrivateArtifactRef,
   PublicEvent,
   ReplaySnapshot,
   RosterEntry,
   RunManifest,
+  SpeechCommitmentLinkRecord,
+  StructuredCommitment,
   StructuredCommitmentEnvelope,
+  StructuredCommitmentPayload,
   TaskOutputRef,
 } from './schema.js';
 
@@ -34,6 +40,7 @@ type DmSpendMap = Record<string, number>;
 export interface SimulatedUtterance {
   agentId: string;
   text: string;
+  commitmentClaims?: readonly CommitmentClaim[];
 }
 
 export interface SimulatedRoundInput {
@@ -84,6 +91,7 @@ function buildPublicEvent(
   kind: PublicEvent['kind'],
   actorAgentIds: readonly string[],
   linkedCommitmentIds: readonly string[],
+  commitmentClaims: readonly CommitmentClaim[],
   payload: Record<string, unknown>,
   index = 0,
 ): PublicEvent {
@@ -97,6 +105,7 @@ function buildPublicEvent(
     layer: 'public',
     actorAgentIds: [...actorAgentIds],
     linkedCommitmentIds: [...linkedCommitmentIds],
+    commitmentClaims: [...commitmentClaims],
     payload,
   };
 }
@@ -139,6 +148,218 @@ function removeAgent(list: readonly string[], agentId: string): string[] {
   return list.filter((current) => current !== agentId);
 }
 
+function flattenStructuredCommitments(envelopes: readonly StructuredCommitmentEnvelope[]): StructuredCommitment[] {
+  return envelopes.flatMap((envelope) => envelope.commitments);
+}
+
+function normalizePayload(payload: StructuredCommitmentPayload): Record<string, unknown> {
+  switch (payload.commitmentType) {
+    case 'ally_set':
+      return {
+        commitmentType: payload.commitmentType,
+        allyAgentIds: [...payload.allyAgentIds].sort(),
+        strength: payload.strength,
+      };
+    case 'task_plan':
+      return {
+        commitmentType: payload.commitmentType,
+        summary: payload.summary,
+        collaboratorAgentIds: [...payload.collaboratorAgentIds].sort(),
+        riskLevel: payload.riskLevel,
+      };
+    case 'intended_vote':
+      return {
+        commitmentType: payload.commitmentType,
+        targetAgentId: payload.targetAgentId,
+        justification: payload.justification ?? null,
+      };
+    case 'betrayal_target':
+      return {
+        commitmentType: payload.commitmentType,
+        targetAgentId: payload.targetAgentId,
+        rationale: payload.rationale ?? null,
+      };
+    case 'freeze':
+      return {
+        commitmentType: payload.commitmentType,
+        reason: payload.reason,
+      };
+    case 'nudge':
+      return {
+        commitmentType: payload.commitmentType,
+        targetAgentId: payload.targetAgentId,
+        prompt: payload.prompt,
+      };
+  }
+}
+
+function payloadsMatch(left: StructuredCommitmentPayload, right: StructuredCommitmentPayload): boolean {
+  return JSON.stringify(normalizePayload(left)) === JSON.stringify(normalizePayload(right));
+}
+
+function buildSpeechCommitmentLinks(
+  manifest: RunManifest,
+  publicEvents: readonly PublicEvent[],
+  privateArtifacts: readonly PrivateArtifactRef[],
+  structuredCommitments: readonly StructuredCommitmentEnvelope[],
+): SpeechCommitmentLinkRecord[] {
+  const links: SpeechCommitmentLinkRecord[] = [];
+  const commitmentById = new Map(flattenStructuredCommitments(structuredCommitments).map((commitment) => [commitment.commitmentId, commitment]));
+
+  function pushLinks(
+    source: {
+      cursor: MatchState['current'];
+      layer: 'public' | 'private';
+      sourceRecordId: string;
+      sourceKind: 'public_event' | 'private_artifact';
+      actorAgentId: string | undefined;
+      linkedCommitmentIds: readonly string[];
+      commitmentClaims: readonly CommitmentClaim[];
+    },
+  ): void {
+    for (const commitmentId of source.linkedCommitmentIds) {
+      const commitment = commitmentById.get(commitmentId);
+      if (!commitment) {
+        continue;
+      }
+
+      const declaredClaim = source.commitmentClaims.find((claim) => claim.commitmentId === commitmentId);
+      const evaluation = declaredClaim
+        ? payloadsMatch(declaredClaim.payload, commitment.payload) ? 'aligned' : 'divergent'
+        : 'unknown';
+      const evidence = declaredClaim ? 'declared_payload' : 'linked_only';
+      const sourceLabel = source.sourceKind === 'public_event' ? 'public speech' : 'private artifact';
+
+      links.push({
+        linkId: `link_${source.sourceRecordId}_${commitmentId}`,
+        runId: manifest.runId,
+        matchId: manifest.matchId,
+        cursor: source.cursor,
+        layer: source.layer,
+        sourceRecordId: source.sourceRecordId,
+        sourceKind: source.sourceKind,
+        agentId: source.actorAgentId ?? commitment.agentId,
+        commitmentId,
+        commitmentType: commitment.payload.commitmentType,
+        evaluation,
+        evidence,
+        summary: declaredClaim
+          ? `${sourceLabel} ${source.sourceRecordId} ${evaluation === 'aligned' ? 'matches' : 'diverges from'} ${commitmentId}`
+          : `${sourceLabel} ${source.sourceRecordId} links to ${commitmentId} without a declared payload`,
+        ...(declaredClaim ? { declaredPayload: declaredClaim.payload } : {}),
+      });
+    }
+  }
+
+  for (const event of publicEvents) {
+    pushLinks({
+      cursor: event.cursor,
+      layer: 'public',
+      sourceRecordId: event.eventId,
+      sourceKind: 'public_event',
+      actorAgentId: event.actorAgentIds[0],
+      linkedCommitmentIds: event.linkedCommitmentIds,
+      commitmentClaims: event.commitmentClaims,
+    });
+  }
+
+  for (const artifact of privateArtifacts) {
+    pushLinks({
+      cursor: artifact.cursor,
+      layer: 'private',
+      sourceRecordId: artifact.artifactId,
+      sourceKind: 'private_artifact',
+      actorAgentId: artifact.agentId,
+      linkedCommitmentIds: artifact.linkedCommitmentIds,
+      commitmentClaims: artifact.commitmentClaims,
+    });
+  }
+
+  return links;
+}
+
+function buildCommitmentDivergences(
+  manifest: RunManifest,
+  publicEvents: readonly PublicEvent[],
+  structuredCommitments: readonly StructuredCommitmentEnvelope[],
+  speechLinks: readonly SpeechCommitmentLinkRecord[],
+  revealedVotesByRound: ReadonlyMap<string, string>,
+): CommitmentDivergenceRecord[] {
+  const divergences: CommitmentDivergenceRecord[] = [];
+  const commitmentById = new Map(flattenStructuredCommitments(structuredCommitments).map((commitment) => [commitment.commitmentId, commitment]));
+  const voteRevealEvents = new Map(
+    publicEvents
+      .filter((event) => event.kind === 'vote_reveal')
+      .map((event) => [event.cursor.round, event]),
+  );
+
+  for (const link of speechLinks) {
+    if (link.evaluation === 'unknown') {
+      continue;
+    }
+
+    if (!link.declaredPayload) {
+      continue;
+    }
+
+    const commitment = commitmentById.get(link.commitmentId);
+    if (!commitment) {
+      continue;
+    }
+
+    divergences.push({
+      divergenceId: `divergence_speech_${link.linkId}`,
+      runId: manifest.runId,
+      matchId: manifest.matchId,
+      cursor: link.cursor,
+      agentId: commitment.agentId,
+      commitmentId: link.commitmentId,
+      commitmentType: commitment.payload.commitmentType,
+      comparison: 'speech_vs_commitment',
+      outcome: link.evaluation,
+      sourceRecordIds: [link.sourceRecordId, link.commitmentId],
+      summary: `Speech evidence ${link.sourceRecordId} is ${link.evaluation} with commitment ${link.commitmentId}`,
+      expectedPayload: commitment.payload,
+      observedPayload: link.declaredPayload,
+    });
+  }
+
+  for (const commitment of flattenStructuredCommitments(structuredCommitments)) {
+    if (commitment.payload.commitmentType !== 'intended_vote') {
+      continue;
+    }
+
+    const revealedTarget = revealedVotesByRound.get(`${commitment.round}:${commitment.agentId}`);
+    if (!revealedTarget) {
+      continue;
+    }
+
+    const revealEvent = voteRevealEvents.get(commitment.round);
+    const observedPayload: StructuredCommitmentPayload = {
+      commitmentType: 'intended_vote',
+      targetAgentId: revealedTarget,
+    };
+
+    divergences.push({
+      divergenceId: `divergence_reveal_${commitment.commitmentId}`,
+      runId: manifest.runId,
+      matchId: manifest.matchId,
+      cursor: { round: commitment.round, phase: 'simultaneous_reveal' },
+      agentId: commitment.agentId,
+      commitmentId: commitment.commitmentId,
+      commitmentType: commitment.payload.commitmentType,
+      comparison: 'commitment_vs_reveal',
+      outcome: payloadsMatch(commitment.payload, observedPayload) ? 'aligned' : 'divergent',
+      sourceRecordIds: revealEvent ? [revealEvent.eventId, commitment.commitmentId] : [commitment.commitmentId],
+      summary: `Revealed vote for ${commitment.agentId} ${payloadsMatch(commitment.payload, observedPayload) ? 'matches' : 'diverges from'} sealed commitment ${commitment.commitmentId}`,
+      expectedPayload: commitment.payload,
+      observedPayload,
+    });
+  }
+
+  return divergences;
+}
+
 export function runDeterministicMatch(input: DeterministicRunnerInput): DeterministicRunnerResult {
   let state = createInitialMatchState(input.manifest, input.roster);
   const publicEvents: PublicEvent[] = [];
@@ -147,6 +368,7 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
   const privateArtifacts: ArtifactBundle['privateArtifacts'] = [];
   const alerts: AlertRecord[] = [];
   const taskOutputs: TaskOutputRef[] = [];
+  const revealedVotesByRound = new Map<string, string>();
   const roundDeltasByAgent: Record<string, number[]> = Object.fromEntries(
     input.roster.map((entry) => [entry.agentId, []]),
   );
@@ -158,7 +380,7 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
     }
 
     publicEvents.push(
-      buildPublicEvent(state.runId, state.matchId, round, state.current.phase, 'round_open', [], [], {
+      buildPublicEvent(state.runId, state.matchId, round, state.current.phase, 'round_open', [], [], [], {
         aliveAgentIds: state.aliveAgentIds,
       }),
     );
@@ -181,7 +403,8 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
           state.current.phase,
           'public_utterance',
           [utterance.agentId],
-          [],
+          utterance.commitmentClaims?.map((claim) => claim.commitmentId) ?? [],
+          utterance.commitmentClaims ?? [],
           { text: utterance.text },
           utteranceIndex,
         ),
@@ -220,10 +443,24 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
     const commitmentReveal = revealStructuredCommitments(state, isoTimestamp(round, phaseOrderIndex(state.current.phase), 2));
     state = commitmentReveal.state;
     if (roundInput.revealedVotes && Object.keys(roundInput.revealedVotes).length > 0) {
+      for (const [agentId, targetAgentId] of Object.entries(roundInput.revealedVotes)) {
+        revealedVotesByRound.set(`${round}:${agentId}`, targetAgentId);
+      }
+
       publicEvents.push(
-        buildPublicEvent(state.runId, state.matchId, round, state.current.phase, 'vote_reveal', Object.keys(roundInput.revealedVotes), [], {
-          votes: roundInput.revealedVotes,
-        }),
+        buildPublicEvent(
+          state.runId,
+          state.matchId,
+          round,
+          state.current.phase,
+          'vote_reveal',
+          Object.keys(roundInput.revealedVotes),
+          [],
+          [],
+          {
+            votes: roundInput.revealedVotes,
+          },
+        ),
       );
     }
     if ((roundInput.structuredCommitments?.length ?? 0) > 0) {
@@ -238,6 +475,7 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
           commitmentReveal.revealedCommitments.flatMap((envelope) =>
             envelope.commitments.map((commitment) => commitment.commitmentId),
           ),
+          [],
           {
             count: commitmentReveal.revealedCommitments.reduce(
               (count, envelope) => count + envelope.commitments.length,
@@ -273,6 +511,7 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
           state.current.phase,
           'elimination',
           [elimination.eliminatedAgentId],
+          [],
           [],
           { voteCounts: elimination.voteCounts },
         ),
@@ -316,7 +555,7 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
       scoreByAgent: applyScoreDeltas(state.scoreByAgent, deltas),
     };
     publicEvents.push(
-      buildPublicEvent(state.runId, state.matchId, round, state.current.phase, 'score_delta', [], [], {
+      buildPublicEvent(state.runId, state.matchId, round, state.current.phase, 'score_delta', [], [], [], {
         deltas,
       }),
     );
@@ -345,12 +584,28 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
     status: 'completed',
   };
 
+  const speechCommitmentLinks = buildSpeechCommitmentLinks(
+    input.manifest,
+    publicEvents,
+    privateArtifacts,
+    finalState.structuredCommitments,
+  );
+  const commitmentDivergences = buildCommitmentDivergences(
+    input.manifest,
+    publicEvents,
+    finalState.structuredCommitments,
+    speechCommitmentLinks,
+    revealedVotesByRound,
+  );
+
   const artifactBundle = createArtifactBundle({
     manifest: input.manifest,
     roster: input.roster,
     publicEvents,
     structuredCommitments: state.structuredCommitments,
     privateArtifacts,
+    speechCommitmentLinks,
+    commitmentDivergences,
     alerts,
     interventions,
     taskOutputs,

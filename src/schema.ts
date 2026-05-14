@@ -340,6 +340,15 @@ export const StructuredCommitmentEnvelopeSchema = Type.Object(
 );
 export type StructuredCommitmentEnvelope = Static<typeof StructuredCommitmentEnvelopeSchema>;
 
+export const CommitmentClaimSchema = Type.Object(
+  {
+    commitmentId: IdSchema,
+    payload: StructuredCommitmentPayloadSchema,
+  },
+  { $id: 'CommitmentClaim' },
+);
+export type CommitmentClaim = Static<typeof CommitmentClaimSchema>;
+
 export const LayerCollectionsSchema = Type.Object(
   {
     publicEventIds: Type.Array(IdSchema),
@@ -381,6 +390,7 @@ export const PublicEventSchema = Type.Object(
     layer: Type.Literal('public'),
     actorAgentIds: Type.Array(IdSchema, { uniqueItems: true }),
     linkedCommitmentIds: Type.Array(IdSchema, { uniqueItems: true }),
+    commitmentClaims: Type.Array(CommitmentClaimSchema),
     payload: MetadataSchema,
   },
   { $id: 'PublicEvent' },
@@ -392,13 +402,75 @@ export const PrivateArtifactRefSchema = Type.Object(
     artifactId: IdSchema,
     runId: IdSchema,
     agentId: IdSchema,
+    cursor: PhaseCursorSchema,
     kind: PrivateArtifactKindSchema,
     timestamp: TimestampSchema,
     linkedEventIds: Type.Array(IdSchema, { uniqueItems: true }),
+    linkedCommitmentIds: Type.Array(IdSchema, { uniqueItems: true }),
+    commitmentClaims: Type.Array(CommitmentClaimSchema),
   },
   { $id: 'PrivateArtifactRef' },
 );
 export type PrivateArtifactRef = Static<typeof PrivateArtifactRefSchema>;
+
+export const LinkSourceKindSchema = Type.Union(
+  [Type.Literal('public_event'), Type.Literal('private_artifact')],
+  { $id: 'LinkSourceKind' },
+);
+export type LinkSourceKind = Static<typeof LinkSourceKindSchema>;
+
+export const DivergenceComparisonSchema = Type.Union(
+  [Type.Literal('speech_vs_commitment'), Type.Literal('commitment_vs_reveal')],
+  { $id: 'DivergenceComparison' },
+);
+export type DivergenceComparison = Static<typeof DivergenceComparisonSchema>;
+
+export const DivergenceOutcomeSchema = Type.Union(
+  [Type.Literal('aligned'), Type.Literal('divergent'), Type.Literal('unknown')],
+  { $id: 'DivergenceOutcome' },
+);
+export type DivergenceOutcome = Static<typeof DivergenceOutcomeSchema>;
+
+export const SpeechCommitmentLinkRecordSchema = Type.Object(
+  {
+    linkId: IdSchema,
+    runId: IdSchema,
+    matchId: IdSchema,
+    cursor: PhaseCursorSchema,
+    layer: Type.Union([Type.Literal('public'), Type.Literal('private')]),
+    sourceRecordId: IdSchema,
+    sourceKind: LinkSourceKindSchema,
+    agentId: IdSchema,
+    commitmentId: IdSchema,
+    commitmentType: CommitmentTypeSchema,
+    evaluation: DivergenceOutcomeSchema,
+    evidence: Type.Union([Type.Literal('declared_payload'), Type.Literal('linked_only')]),
+    summary: Type.String({ minLength: 1 }),
+    declaredPayload: Type.Optional(StructuredCommitmentPayloadSchema),
+  },
+  { $id: 'SpeechCommitmentLinkRecord' },
+);
+export type SpeechCommitmentLinkRecord = Static<typeof SpeechCommitmentLinkRecordSchema>;
+
+export const CommitmentDivergenceRecordSchema = Type.Object(
+  {
+    divergenceId: IdSchema,
+    runId: IdSchema,
+    matchId: IdSchema,
+    cursor: PhaseCursorSchema,
+    agentId: IdSchema,
+    commitmentId: IdSchema,
+    commitmentType: CommitmentTypeSchema,
+    comparison: DivergenceComparisonSchema,
+    outcome: DivergenceOutcomeSchema,
+    sourceRecordIds: Type.Array(IdSchema, { minItems: 1, uniqueItems: true }),
+    summary: Type.String({ minLength: 1 }),
+    expectedPayload: StructuredCommitmentPayloadSchema,
+    observedPayload: Type.Optional(StructuredCommitmentPayloadSchema),
+  },
+  { $id: 'CommitmentDivergenceRecord' },
+);
+export type CommitmentDivergenceRecord = Static<typeof CommitmentDivergenceRecordSchema>;
 
 export const AlertRecordSchema = Type.Object(
   {
@@ -561,6 +633,8 @@ export const ArtifactBundleSchema = Type.Object(
     publicEvents: Type.Array(PublicEventSchema),
     structuredCommitments: Type.Array(StructuredCommitmentEnvelopeSchema),
     privateArtifacts: Type.Array(PrivateArtifactRefSchema),
+    speechCommitmentLinks: Type.Array(SpeechCommitmentLinkRecordSchema),
+    commitmentDivergences: Type.Array(CommitmentDivergenceRecordSchema),
     alerts: Type.Array(AlertRecordSchema),
     interventions: Type.Array(InterventionRecordSchema),
     taskOutputs: Type.Array(TaskOutputRefSchema),
@@ -574,9 +648,14 @@ export const RuntimeSchemas = {
   AlertRecordSchema,
   ArtifactBundleSchema,
   AwaitRecordSchema,
+  CommitmentClaimSchema,
+  CommitmentDivergenceRecordSchema,
   ConditionSchema,
+  DivergenceComparisonSchema,
+  DivergenceOutcomeSchema,
   FinalScoreRowSchema,
   InterventionRecordSchema,
+  LinkSourceKindSchema,
   MatchStateSchema,
   PhaseCursorSchema,
   PublicEventSchema,
@@ -585,6 +664,7 @@ export const RuntimeSchemas = {
   ReplaySnapshotSchema,
   RosterEntrySchema,
   RunManifestSchema,
+  SpeechCommitmentLinkRecordSchema,
   StructuredCommitmentEnvelopeSchema,
   StructuredCommitmentSchema,
   TaskOutputRefSchema,

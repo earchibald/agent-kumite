@@ -5,6 +5,7 @@ import {
   ArtifactBundleSchema,
   AwaitKind,
   AwaitRecordSchema,
+  CommitmentClaim,
   Condition,
   MatchStateSchema,
   ROUND_PHASE_ORDER,
@@ -13,6 +14,10 @@ import {
   RoundPhase,
   RunManifestSchema,
   type ArtifactBundle,
+  type CommitmentDivergenceRecord,
+  type PrivateArtifactRef,
+  type PublicEvent,
+  type SpeechCommitmentLinkRecord,
   type StructuredCommitment,
   type StructuredCommitmentEnvelope,
 } from './schema.js';
@@ -164,6 +169,8 @@ export function validateArtifactBundleConsistency(bundle: ArtifactBundle): strin
         errors.push(`public event ${event.eventId} references unknown agent ${agentId}`);
       }
     }
+
+    errors.push(...validateCommitmentClaims(event.eventId, event.commitmentClaims, event.linkedCommitmentIds));
   }
 
   for (const envelope of bundle.structuredCommitments) {
@@ -186,6 +193,43 @@ export function validateArtifactBundleConsistency(bundle: ArtifactBundle): strin
     if (!agentIds.has(artifact.agentId)) {
       errors.push(`private artifact ${artifact.artifactId} references unknown agent ${artifact.agentId}`);
     }
+
+    errors.push(...validateCommitmentClaims(artifact.artifactId, artifact.commitmentClaims, artifact.linkedCommitmentIds));
+
+    for (const commitmentId of artifact.linkedCommitmentIds) {
+      if (!commitmentIds.has(commitmentId)) {
+        errors.push(`private artifact ${artifact.artifactId} references unknown commitment ${commitmentId}`);
+      }
+    }
+  }
+
+  const publicEventIds = new Set(bundle.publicEvents.map((event) => event.eventId));
+  const privateArtifactIds = new Set(bundle.privateArtifacts.map((artifact) => artifact.artifactId));
+
+  for (const link of bundle.speechCommitmentLinks) {
+    errors.push(
+      ...validateSpeechCommitmentLinkRecord(link, {
+        runId,
+        matchId,
+        agentIds,
+        commitmentIds,
+        publicEventIds,
+        privateArtifactIds,
+      }),
+    );
+  }
+
+  for (const divergence of bundle.commitmentDivergences) {
+    errors.push(
+      ...validateCommitmentDivergenceRecord(divergence, {
+        runId,
+        matchId,
+        agentIds,
+        commitmentIds,
+        publicEventIds,
+        privateArtifactIds,
+      }),
+    );
   }
 
   for (const alert of bundle.alerts) {
@@ -338,6 +382,113 @@ function validateStructuredCommitment(
       break;
     case 'freeze':
       break;
+  }
+
+  return errors;
+}
+
+function validateCommitmentClaims(
+  sourceRecordId: string,
+  claims: readonly CommitmentClaim[],
+  linkedCommitmentIds: readonly string[],
+): string[] {
+  const errors: string[] = [];
+  const linkedIds = new Set(linkedCommitmentIds);
+
+  for (const claim of claims) {
+    if (!linkedIds.has(claim.commitmentId)) {
+      errors.push(`record ${sourceRecordId} declares claim for ${claim.commitmentId} without linking that commitment id`);
+    }
+  }
+
+  return errors;
+}
+
+function validateSpeechCommitmentLinkRecord(
+  link: SpeechCommitmentLinkRecord,
+  context: {
+    runId: string;
+    matchId: string;
+    agentIds: Set<string>;
+    commitmentIds: Set<string>;
+    publicEventIds: Set<string>;
+    privateArtifactIds: Set<string>;
+  },
+): string[] {
+  const errors: string[] = [];
+
+  if (link.runId !== context.runId) {
+    errors.push(`speech link ${link.linkId} has runId ${link.runId} but manifest runId is ${context.runId}`);
+  }
+
+  if (link.matchId !== context.matchId) {
+    errors.push(`speech link ${link.linkId} has matchId ${link.matchId} but manifest matchId is ${context.matchId}`);
+  }
+
+  if (!context.agentIds.has(link.agentId)) {
+    errors.push(`speech link ${link.linkId} references unknown agent ${link.agentId}`);
+  }
+
+  if (!context.commitmentIds.has(link.commitmentId)) {
+    errors.push(`speech link ${link.linkId} references unknown commitment ${link.commitmentId}`);
+  }
+
+  if (link.sourceKind === 'public_event' && !context.publicEventIds.has(link.sourceRecordId)) {
+    errors.push(`speech link ${link.linkId} references unknown public event ${link.sourceRecordId}`);
+  }
+
+  if (link.sourceKind === 'private_artifact' && !context.privateArtifactIds.has(link.sourceRecordId)) {
+    errors.push(`speech link ${link.linkId} references unknown private artifact ${link.sourceRecordId}`);
+  }
+
+  if (link.evidence === 'declared_payload' && !link.declaredPayload) {
+    errors.push(`speech link ${link.linkId} requires declaredPayload for evidence type declared_payload`);
+  }
+
+  return errors;
+}
+
+function validateCommitmentDivergenceRecord(
+  divergence: CommitmentDivergenceRecord,
+  context: {
+    runId: string;
+    matchId: string;
+    agentIds: Set<string>;
+    commitmentIds: Set<string>;
+    publicEventIds: Set<string>;
+    privateArtifactIds: Set<string>;
+  },
+): string[] {
+  const errors: string[] = [];
+
+  if (divergence.runId !== context.runId) {
+    errors.push(`divergence ${divergence.divergenceId} has runId ${divergence.runId} but manifest runId is ${context.runId}`);
+  }
+
+  if (divergence.matchId !== context.matchId) {
+    errors.push(`divergence ${divergence.divergenceId} has matchId ${divergence.matchId} but manifest matchId is ${context.matchId}`);
+  }
+
+  if (!context.agentIds.has(divergence.agentId)) {
+    errors.push(`divergence ${divergence.divergenceId} references unknown agent ${divergence.agentId}`);
+  }
+
+  if (!context.commitmentIds.has(divergence.commitmentId)) {
+    errors.push(`divergence ${divergence.divergenceId} references unknown commitment ${divergence.commitmentId}`);
+  }
+
+  for (const sourceRecordId of divergence.sourceRecordIds) {
+    const known =
+      context.commitmentIds.has(sourceRecordId)
+      || context.publicEventIds.has(sourceRecordId)
+      || context.privateArtifactIds.has(sourceRecordId);
+    if (!known) {
+      errors.push(`divergence ${divergence.divergenceId} references unknown source record ${sourceRecordId}`);
+    }
+  }
+
+  if (divergence.outcome !== 'unknown' && !divergence.observedPayload) {
+    errors.push(`divergence ${divergence.divergenceId} must include observedPayload when outcome is ${divergence.outcome}`);
   }
 
   return errors;

@@ -68,7 +68,22 @@ describe('deterministic harness runner', () => {
           },
         },
         {
-          publicUtterances: [{ agentId: 'agent-alpha', text: 'Alpha nominates Saboteur.' }],
+          publicUtterances: [
+            {
+              agentId: 'agent-alpha',
+              text: 'Alpha nominates Saboteur.',
+              commitmentClaims: [
+                {
+                  commitmentId: 'commit_r3_agent_alpha_vote',
+                  payload: {
+                    commitmentType: 'intended_vote',
+                    targetAgentId: 'agent-saboteur',
+                    justification: 'Saboteur is driving the table off consensus.',
+                  },
+                },
+              ],
+            },
+          ],
           structuredCommitments: roundThreeCommitments,
           intendedVotes: {
             'agent-alpha': 'agent-saboteur',
@@ -94,6 +109,29 @@ describe('deterministic harness runner', () => {
             'agent-analyst': 1,
             'agent-saboteur': 2,
           },
+          privateArtifacts: [
+            {
+              artifactId: 'trace_r3_saboteur_01',
+              runId: c4Manifest.runId,
+              agentId: 'agent-saboteur',
+              cursor: { round: 3, phase: 'task_submission' },
+              kind: 'reported_reasoning',
+              timestamp: '2026-05-14T00:29:00Z',
+              linkedEventIds: [],
+              linkedCommitmentIds: ['commit_r3_agent_saboteur_task_plan'],
+              commitmentClaims: [
+                {
+                  commitmentId: 'commit_r3_agent_saboteur_task_plan',
+                  payload: {
+                    commitmentType: 'task_plan',
+                    summary: 'Work cleanly with Delta to stay under suspicion.',
+                    collaboratorAgentIds: ['agent-delta'],
+                    riskLevel: 'low',
+                  },
+                },
+              ],
+            },
+          ],
           saboteurBonusAgentIds: ['agent-saboteur'],
         },
       ],
@@ -104,6 +142,11 @@ describe('deterministic harness runner', () => {
     expect(result.finalOutcome.winnerIds).toContain('agent-alpha');
     expect(result.publicEvents.some((event) => event.kind === 'elimination')).toBe(true);
     expect(result.artifactBundle.structuredCommitments.every((envelope) => envelope.status === 'revealed')).toBe(true);
+    expect(result.artifactBundle.speechCommitmentLinks.length).toBeGreaterThanOrEqual(2);
+    expect(result.artifactBundle.commitmentDivergences.length).toBeGreaterThanOrEqual(3);
+    expect(
+      result.artifactBundle.commitmentDivergences.map((record) => record.comparison),
+    ).toEqual(expect.arrayContaining(['speech_vs_commitment', 'commitment_vs_reveal']));
     expect(
       result.artifactBundle.structuredCommitments.flatMap((envelope) => envelope.commitments).map((commitment) => commitment.payload.commitmentType),
     ).toEqual(expect.arrayContaining(['intended_vote', 'ally_set', 'task_plan', 'betrayal_target']));

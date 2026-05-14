@@ -22,7 +22,7 @@ describe('bundled local harness output', () => {
   it('writes artifacts and aftermath report into a predictable directory', async () => {
     const outputDir = await mkdtemp(join(tmpdir(), 'agent-kumite-bundle-'));
     const result = await runHarnessBundleFromFile({
-      inputPath: join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-23', 'fixtures/demo-match.input.json'),
+      inputPath: join('/Users/earchibald/Code/agent-kumite/.worktrees/AK-24', 'fixtures/demo-match.input.json'),
       outputDir,
       pretty: true,
     });
@@ -31,9 +31,12 @@ describe('bundled local harness output', () => {
     const report = await readFile(result.reportPath, 'utf8');
 
     expect(validateArtifactBundle(artifact)).toEqual([]);
+    expect(artifact.speechCommitmentLinks.length).toBeGreaterThan(0);
+    expect(artifact.commitmentDivergences.length).toBeGreaterThan(0);
     expect(result.artifactPath).toBe(join(outputDir, 'artifact-bundle.json'));
     expect(result.reportPath).toBe(join(outputDir, 'aftermath.txt'));
     expect(report).toContain('Winners: agent-alpha');
+    expect(report).toContain('Divergences:');
     expect(report).toContain('Eliminations: r3:agent-saboteur');
   });
 });

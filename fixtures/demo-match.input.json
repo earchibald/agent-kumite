@@ -51,7 +51,20 @@
     },
     {
       "publicUtterances": [
-        { "agentId": "agent-alpha", "text": "Alpha nominates Saboteur." }
+        {
+          "agentId": "agent-alpha",
+          "text": "Alpha nominates Saboteur.",
+          "commitmentClaims": [
+            {
+              "commitmentId": "commit_r3_agent_alpha_vote",
+              "payload": {
+                "commitmentType": "intended_vote",
+                "targetAgentId": "agent-saboteur",
+                "justification": "Alpha thinks Saboteur is the cleanest elimination."
+              }
+            }
+          ]
+        }
       ],
       "structuredCommitments": [
         {
@@ -132,6 +145,29 @@
         "agent-analyst": 1,
         "agent-saboteur": 2
       },
+      "privateArtifacts": [
+        {
+          "artifactId": "trace_r3_saboteur_01",
+          "runId": "run_demo_c4_0001",
+          "agentId": "agent-saboteur",
+          "cursor": { "round": 3, "phase": "task_submission" },
+          "kind": "reported_reasoning",
+          "timestamp": "2026-05-14T00:29:00Z",
+          "linkedEventIds": [],
+          "linkedCommitmentIds": ["commit_r3_agent_saboteur_task"],
+          "commitmentClaims": [
+            {
+              "commitmentId": "commit_r3_agent_saboteur_task",
+              "payload": {
+                "commitmentType": "task_plan",
+                "summary": "Work cleanly with Delta and avoid drawing suspicion.",
+                "collaboratorAgentIds": ["agent-delta"],
+                "riskLevel": "low"
+              }
+            }
+          ]
+        }
+      ],
       "saboteurBonusAgentIds": ["agent-saboteur"]
     }
   ]

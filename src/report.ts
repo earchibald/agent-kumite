@@ -27,6 +27,12 @@ export interface ReplayMarkerSummary {
   labels: string[];
 }
 
+export interface DivergenceSummary {
+  total: number;
+  byComparison: Record<string, number>;
+  byOutcome: Record<string, number>;
+}
+
 export interface AftermathReport {
   runId: string;
   matchId: string;
@@ -35,6 +41,7 @@ export interface AftermathReport {
   standings: AftermathStanding[];
   eliminations: EliminationBeat[];
   interventionSummary: CountSummary;
+  divergenceSummary: DivergenceSummary;
   replayMarkerSummary: ReplayMarkerSummary;
   roundScores: RoundScoreSummary[];
 }
@@ -107,6 +114,11 @@ export function createAftermathReport(bundle: ArtifactBundle): AftermathReport {
       total: bundle.interventions.length,
       byType: countByType(bundle.interventions.map((record) => record.kind)),
     },
+    divergenceSummary: {
+      total: bundle.commitmentDivergences.length,
+      byComparison: countByType(bundle.commitmentDivergences.map((record) => record.comparison)),
+      byOutcome: countByType(bundle.commitmentDivergences.map((record) => record.outcome)),
+    },
     replayMarkerSummary: summarizeReplayMarkers(bundle.replayBundle.markers),
     roundScores: summarizeRoundScores(bundle),
   };
@@ -125,6 +137,7 @@ export function renderAftermathReport(report: AftermathReport): string {
     }`,
   );
   lines.push(`Interventions: ${report.interventionSummary.total}`);
+  lines.push(`Divergences: ${report.divergenceSummary.total}`);
   lines.push(
     `Replay markers: ${report.replayMarkerSummary.total}${
       report.replayMarkerSummary.labels.length > 0 ? ` (${report.replayMarkerSummary.labels.join(' | ')})` : ''
