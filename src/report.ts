@@ -37,6 +37,7 @@ export interface AftermathReport {
   runId: string;
   matchId: string;
   condition: ArtifactBundle['manifest']['condition'];
+  benchmarkSummary: ArtifactBundle['benchmarkSummary'];
   winners: AftermathStanding[];
   standings: AftermathStanding[];
   eliminations: EliminationBeat[];
@@ -107,6 +108,7 @@ export function createAftermathReport(bundle: ArtifactBundle): AftermathReport {
     runId: bundle.manifest.runId,
     matchId: bundle.manifest.matchId,
     condition: bundle.manifest.condition,
+    benchmarkSummary: bundle.benchmarkSummary,
     winners,
     standings,
     eliminations: summarizeEliminations(bundle),
@@ -129,6 +131,9 @@ export function renderAftermathReport(report: AftermathReport): string {
 
   lines.push(`Run: ${report.runId} (${report.condition})`);
   lines.push(`Match: ${report.matchId}`);
+  lines.push(
+    `Benchmark: rounds=${report.benchmarkSummary.roundsPlayed}, markers=${report.benchmarkSummary.totals.replayMarkers}, links=${report.benchmarkSummary.totals.speechCommitmentLinks}`,
+  );
   lines.push('');
   lines.push(`Winners: ${report.winners.map((winner) => `${winner.agentId} (${winner.total})`).join(', ') || 'none'}`);
   lines.push(

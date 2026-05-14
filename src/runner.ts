@@ -17,12 +17,14 @@ import type {
   AlertRecord,
   ArtifactBundle,
   AwaitRecord,
+  BenchmarkSummary,
   CommitmentClaim,
   CommitmentDivergenceRecord,
   InterventionRecord,
   MatchState,
   PrivateArtifactRef,
   PublicEvent,
+  ReplayMarker,
   ReplaySnapshot,
   RosterEntry,
   RunManifest,
@@ -70,6 +72,22 @@ export interface DeterministicRunnerResult {
   snapshots: ReplaySnapshot[];
   artifactBundle: ArtifactBundle;
   finalOutcome: FinalOutcomeResult;
+}
+
+function contextualizeAwaitRecord(
+  awaitRecord: AwaitRecord,
+  state: MatchState,
+): AwaitRecord {
+  return {
+    ...awaitRecord,
+    scope: {
+      ...awaitRecord.scope,
+      runId: state.runId,
+      matchId: state.matchId,
+      round: state.current.round,
+      phase: state.current.phase,
+    },
+  };
 }
 
 function isoTimestamp(round: number, phaseIndex: number, offset = 0): string {
@@ -150,6 +168,13 @@ function removeAgent(list: readonly string[], agentId: string): string[] {
 
 function flattenStructuredCommitments(envelopes: readonly StructuredCommitmentEnvelope[]): StructuredCommitment[] {
   return envelopes.flatMap((envelope) => envelope.commitments);
+}
+
+function countByType<T extends string>(values: readonly T[]): Record<string, number> {
+  return values.reduce<Record<string, number>>((counts, value) => {
+    counts[value] = (counts[value] ?? 0) + 1;
+    return counts;
+  }, {});
 }
 
 function normalizePayload(payload: StructuredCommitmentPayload): Record<string, unknown> {
@@ -360,6 +385,153 @@ function buildCommitmentDivergences(
   return divergences;
 }
 
+function buildReplayMarkers(
+  manifest: RunManifest,
+  publicEvents: readonly PublicEvent[],
+  alerts: readonly AlertRecord[],
+  interventions: readonly InterventionRecord[],
+  divergences: readonly CommitmentDivergenceRecord[],
+): ReplayMarker[] {
+  const markers: ReplayMarker[] = [];
+
+  for (const event of publicEvents) {
+    if (event.kind === 'vote_reveal') {
+      markers.push({
+        markerId: `marker_${event.eventId}`,
+        runId: manifest.runId,
+        cursor: event.cursor,
+        markerType: 'reveal',
+        label: `Round ${event.cursor.round} votes revealed`,
+        sourceEventIds: [event.eventId],
+      });
+      continue;
+    }
+
+    if (event.kind === 'commitment_reveal') {
+      markers.push({
+        markerId: `marker_${event.eventId}`,
+        runId: manifest.runId,
+        cursor: event.cursor,
+        markerType: 'reveal',
+        label: `Round ${event.cursor.round} commitments revealed`,
+        sourceEventIds: [event.eventId],
+      });
+      continue;
+    }
+
+    if (event.kind === 'elimination') {
+      markers.push({
+        markerId: `marker_${event.eventId}`,
+        runId: manifest.runId,
+        cursor: event.cursor,
+        markerType: 'elimination',
+        label: `Round ${event.cursor.round} elimination: ${event.actorAgentIds.join(', ')}`,
+        sourceEventIds: [event.eventId],
+      });
+      continue;
+    }
+
+    if (event.kind === 'score_delta') {
+      markers.push({
+        markerId: `marker_${event.eventId}`,
+        runId: manifest.runId,
+        cursor: event.cursor,
+        markerType: 'bookmark',
+        label: `Round ${event.cursor.round} scores posted`,
+        sourceEventIds: [event.eventId],
+      });
+    }
+  }
+
+  for (const alert of alerts) {
+    markers.push({
+      markerId: `marker_${alert.alertId}`,
+      runId: manifest.runId,
+      cursor: alert.cursor,
+      markerType: 'alert',
+      label: alert.message,
+      sourceEventIds: [...alert.sourceRecordIds],
+    });
+  }
+
+  for (const intervention of interventions) {
+    markers.push({
+      markerId: `marker_${intervention.interventionId}_open`,
+      runId: manifest.runId,
+      cursor: intervention.cursor,
+      markerType: 'await_open',
+      label: `Await opened: ${intervention.kind}`,
+      sourceEventIds: [intervention.interventionId],
+      linkedAwaitId: intervention.awaitId,
+    });
+
+    if (intervention.status !== 'pending') {
+      markers.push({
+        markerId: `marker_${intervention.interventionId}_resolved`,
+        runId: manifest.runId,
+        cursor: intervention.cursor,
+        markerType: 'await_resolved',
+        label: `Await resolved: ${intervention.kind}`,
+        sourceEventIds: [intervention.interventionId],
+        linkedAwaitId: intervention.awaitId,
+      });
+    }
+  }
+
+  for (const divergence of divergences) {
+    if (divergence.outcome !== 'divergent') {
+      continue;
+    }
+
+    markers.push({
+      markerId: `marker_${divergence.divergenceId}`,
+      runId: manifest.runId,
+      cursor: divergence.cursor,
+      markerType: 'betrayal',
+      label: divergence.summary,
+      sourceEventIds: [...divergence.sourceRecordIds],
+    });
+  }
+
+  return markers;
+}
+
+function buildBenchmarkSummary(
+  manifest: RunManifest,
+  finalState: MatchState,
+  finalOutcome: FinalOutcomeResult,
+  publicEvents: readonly PublicEvent[],
+  privateArtifacts: readonly PrivateArtifactRef[],
+  structuredCommitments: readonly StructuredCommitmentEnvelope[],
+  speechCommitmentLinks: readonly SpeechCommitmentLinkRecord[],
+  commitmentDivergences: readonly CommitmentDivergenceRecord[],
+  replayMarkers: readonly ReplayMarker[],
+  alerts: readonly AlertRecord[],
+  interventions: readonly InterventionRecord[],
+): BenchmarkSummary {
+  return {
+    runId: manifest.runId,
+    matchId: manifest.matchId,
+    condition: manifest.condition,
+    roundsPlayed: finalState.current.round,
+    winnerIds: [...finalOutcome.winnerIds],
+    eliminatedAgentIds: [...finalState.eliminatedAgentIds],
+    totals: {
+      publicEvents: publicEvents.length,
+      privateArtifacts: privateArtifacts.length,
+      structuredCommitments: flattenStructuredCommitments(structuredCommitments).length,
+      speechCommitmentLinks: speechCommitmentLinks.length,
+      commitmentDivergences: commitmentDivergences.length,
+      replayMarkers: replayMarkers.length,
+      alerts: alerts.length,
+      interventions: interventions.length,
+    },
+    replayMarkersByType: countByType(replayMarkers.map((marker) => marker.markerType)),
+    divergenceByOutcome: countByType(commitmentDivergences.map((record) => record.outcome)),
+    highlightLabels: replayMarkers.slice(0, 8).map((marker) => marker.label),
+  };
+}
+
 export function runDeterministicMatch(input: DeterministicRunnerInput): DeterministicRunnerResult {
   let state = createInitialMatchState(input.manifest, input.roster);
   const publicEvents: PublicEvent[] = [];
@@ -413,17 +585,20 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
 
     state = advanceMatchState(state); // task_submission
     if (roundInput.awaitingDefaults?.length) {
+      const contextualAwaitRecords = roundInput.awaitingDefaults.map((awaitRecord) =>
+        contextualizeAwaitRecord(awaitRecord, state),
+      );
       state = {
         ...state,
         status: 'paused',
-        openAwaitIds: roundInput.awaitingDefaults.map((awaitRecord) => awaitRecord.awaitId),
+        openAwaitIds: contextualAwaitRecords.map((awaitRecord) => awaitRecord.awaitId),
         layers: {
           ...state.layers,
-          interventionQueueIds: roundInput.awaitingDefaults.map((awaitRecord) => awaitRecord.awaitId),
+          interventionQueueIds: contextualAwaitRecords.map((awaitRecord) => awaitRecord.awaitId),
         },
       };
 
-      for (const awaitRecord of roundInput.awaitingDefaults) {
+      for (const awaitRecord of contextualAwaitRecords) {
         const resolution = resolveAwaitByDefault(awaitRecord, input.manifest.condition, isoTimestamp(round, phaseOrderIndex(state.current.phase), 1));
         interventions.push(resolution.interventionRecord);
       }
@@ -597,9 +772,30 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
     speechCommitmentLinks,
     revealedVotesByRound,
   );
+  const replayMarkers = buildReplayMarkers(
+    input.manifest,
+    publicEvents,
+    alerts,
+    interventions,
+    commitmentDivergences,
+  );
+  const benchmarkSummary = buildBenchmarkSummary(
+    input.manifest,
+    finalState,
+    finalOutcome,
+    publicEvents,
+    privateArtifacts,
+    finalState.structuredCommitments,
+    speechCommitmentLinks,
+    commitmentDivergences,
+    replayMarkers,
+    alerts,
+    interventions,
+  );
 
   const artifactBundle = createArtifactBundle({
     manifest: input.manifest,
+    benchmarkSummary,
     roster: input.roster,
     publicEvents,
     structuredCommitments: state.structuredCommitments,
@@ -611,7 +807,7 @@ export function runDeterministicMatch(input: DeterministicRunnerInput): Determin
     taskOutputs,
     finalScores: finalOutcome.finalScores,
     snapshots,
-    markers: [],
+    markers: replayMarkers,
   });
 
   return {

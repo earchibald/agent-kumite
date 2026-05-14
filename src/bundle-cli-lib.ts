@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 
 import { runHarnessFromFile } from './cli-lib.js';
@@ -12,6 +13,7 @@ export interface BundleCliOptions {
 export interface BundleRunResult {
   artifactPath: string;
   reportPath: string;
+  benchmarkSummaryPath: string;
 }
 
 export function parseBundleCliArgs(args: readonly string[]): BundleCliOptions {
@@ -63,8 +65,9 @@ export function parseBundleCliArgs(args: readonly string[]): BundleCliOptions {
 export async function runHarnessBundleFromFile(options: BundleCliOptions): Promise<BundleRunResult> {
   const artifactPath = join(options.outputDir, 'artifact-bundle.json');
   const reportPath = join(options.outputDir, 'aftermath.txt');
+  const benchmarkSummaryPath = join(options.outputDir, 'benchmark-summary.json');
 
-  await runHarnessFromFile({
+  const result = await runHarnessFromFile({
     inputPath: options.inputPath,
     outputPath: artifactPath,
     pretty: options.pretty,
@@ -75,7 +78,13 @@ export async function runHarnessBundleFromFile(options: BundleCliOptions): Promi
     outputPath: reportPath,
   });
 
-  return { artifactPath, reportPath };
+  await mkdir(options.outputDir, { recursive: true });
+  await writeFile(
+    benchmarkSummaryPath,
+    JSON.stringify(result.artifactBundle.benchmarkSummary, null, options.pretty ? 2 : undefined),
+  );
+
+  return { artifactPath, reportPath, benchmarkSummaryPath };
 }
 
 export function bundleUsageText(): string {

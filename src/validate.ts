@@ -146,6 +146,20 @@ export function validateArtifactBundleConsistency(bundle: ArtifactBundle): strin
   const agentIds = new Set(bundle.roster.map((entry) => entry.agentId));
   const commitmentIds = new Set<string>();
 
+  if (bundle.benchmarkSummary.runId !== runId) {
+    errors.push(`benchmark summary runId ${bundle.benchmarkSummary.runId} does not match manifest runId ${runId}`);
+  }
+
+  if (bundle.benchmarkSummary.matchId !== matchId) {
+    errors.push(`benchmark summary matchId ${bundle.benchmarkSummary.matchId} does not match manifest matchId ${matchId}`);
+  }
+
+  if (bundle.benchmarkSummary.condition !== bundle.manifest.condition) {
+    errors.push(
+      `benchmark summary condition ${bundle.benchmarkSummary.condition} does not match manifest condition ${bundle.manifest.condition}`,
+    );
+  }
+
   if (bundle.replayBundle.runId !== runId) {
     errors.push(`replay bundle runId ${bundle.replayBundle.runId} does not match manifest runId ${runId}`);
   }
@@ -269,6 +283,57 @@ export function validateArtifactBundleConsistency(bundle: ArtifactBundle): strin
     if (!agentIds.has(row.agentId)) {
       errors.push(`final score row references unknown agent ${row.agentId}`);
     }
+  }
+
+  const roundsPlayed = Math.max(...bundle.replayBundle.timeline.map((cursor) => cursor.round));
+  if (bundle.benchmarkSummary.roundsPlayed !== roundsPlayed) {
+    errors.push(`benchmark summary roundsPlayed ${bundle.benchmarkSummary.roundsPlayed} does not match replay timeline max round ${roundsPlayed}`);
+  }
+
+  if (bundle.benchmarkSummary.totals.publicEvents !== bundle.publicEvents.length) {
+    errors.push(`benchmark summary publicEvents total ${bundle.benchmarkSummary.totals.publicEvents} does not match actual count ${bundle.publicEvents.length}`);
+  }
+
+  if (bundle.benchmarkSummary.totals.privateArtifacts !== bundle.privateArtifacts.length) {
+    errors.push(`benchmark summary privateArtifacts total ${bundle.benchmarkSummary.totals.privateArtifacts} does not match actual count ${bundle.privateArtifacts.length}`);
+  }
+
+  const structuredCommitmentCount = bundle.structuredCommitments.reduce(
+    (count, envelope) => count + envelope.commitments.length,
+    0,
+  );
+  if (bundle.benchmarkSummary.totals.structuredCommitments !== structuredCommitmentCount) {
+    errors.push(`benchmark summary structuredCommitments total ${bundle.benchmarkSummary.totals.structuredCommitments} does not match actual count ${structuredCommitmentCount}`);
+  }
+
+  if (bundle.benchmarkSummary.totals.speechCommitmentLinks !== bundle.speechCommitmentLinks.length) {
+    errors.push(`benchmark summary speechCommitmentLinks total ${bundle.benchmarkSummary.totals.speechCommitmentLinks} does not match actual count ${bundle.speechCommitmentLinks.length}`);
+  }
+
+  if (bundle.benchmarkSummary.totals.commitmentDivergences !== bundle.commitmentDivergences.length) {
+    errors.push(`benchmark summary commitmentDivergences total ${bundle.benchmarkSummary.totals.commitmentDivergences} does not match actual count ${bundle.commitmentDivergences.length}`);
+  }
+
+  if (bundle.benchmarkSummary.totals.replayMarkers !== bundle.replayBundle.markers.length) {
+    errors.push(`benchmark summary replayMarkers total ${bundle.benchmarkSummary.totals.replayMarkers} does not match actual count ${bundle.replayBundle.markers.length}`);
+  }
+
+  if (bundle.benchmarkSummary.totals.alerts !== bundle.alerts.length) {
+    errors.push(`benchmark summary alerts total ${bundle.benchmarkSummary.totals.alerts} does not match actual count ${bundle.alerts.length}`);
+  }
+
+  if (bundle.benchmarkSummary.totals.interventions !== bundle.interventions.length) {
+    errors.push(`benchmark summary interventions total ${bundle.benchmarkSummary.totals.interventions} does not match actual count ${bundle.interventions.length}`);
+  }
+
+  const replayMarkersByType = countByType(bundle.replayBundle.markers.map((marker) => marker.markerType));
+  if (JSON.stringify(bundle.benchmarkSummary.replayMarkersByType) !== JSON.stringify(replayMarkersByType)) {
+    errors.push('benchmark summary replayMarkersByType does not match actual replay marker distribution');
+  }
+
+  const divergenceByOutcome = countByType(bundle.commitmentDivergences.map((record) => record.outcome));
+  if (JSON.stringify(bundle.benchmarkSummary.divergenceByOutcome) !== JSON.stringify(divergenceByOutcome)) {
+    errors.push('benchmark summary divergenceByOutcome does not match actual divergence distribution');
   }
 
   return errors;
@@ -492,4 +557,11 @@ function validateCommitmentDivergenceRecord(
   }
 
   return errors;
+}
+
+function countByType<T extends string>(values: readonly T[]): Record<string, number> {
+  return values.reduce<Record<string, number>>((counts, value) => {
+    counts[value] = (counts[value] ?? 0) + 1;
+    return counts;
+  }, {});
 }

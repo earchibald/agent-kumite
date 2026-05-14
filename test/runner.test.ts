@@ -144,9 +144,17 @@ describe('deterministic harness runner', () => {
     expect(result.artifactBundle.structuredCommitments.every((envelope) => envelope.status === 'revealed')).toBe(true);
     expect(result.artifactBundle.speechCommitmentLinks.length).toBeGreaterThanOrEqual(2);
     expect(result.artifactBundle.commitmentDivergences.length).toBeGreaterThanOrEqual(3);
+    expect(result.artifactBundle.replayBundle.markers.length).toBeGreaterThan(0);
+    expect(result.artifactBundle.benchmarkSummary.roundsPlayed).toBe(3);
+    expect(result.artifactBundle.benchmarkSummary.totals.replayMarkers).toBe(
+      result.artifactBundle.replayBundle.markers.length,
+    );
     expect(
       result.artifactBundle.commitmentDivergences.map((record) => record.comparison),
     ).toEqual(expect.arrayContaining(['speech_vs_commitment', 'commitment_vs_reveal']));
+    expect(
+      result.artifactBundle.replayBundle.markers.map((marker) => marker.markerType),
+    ).toEqual(expect.arrayContaining(['reveal', 'elimination', 'betrayal', 'bookmark']));
     expect(
       result.artifactBundle.structuredCommitments.flatMap((envelope) => envelope.commitments).map((commitment) => commitment.payload.commitmentType),
     ).toEqual(expect.arrayContaining(['intended_vote', 'ally_set', 'task_plan', 'betrayal_target']));

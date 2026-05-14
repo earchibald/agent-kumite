@@ -157,10 +157,13 @@ describe('core harness engine', () => {
 
     const generated = createArtifactBundle({
       manifest,
+      benchmarkSummary: artifactFixture.benchmarkSummary,
       roster,
       publicEvents: artifactFixture.publicEvents,
       structuredCommitments: artifactFixture.structuredCommitments,
       privateArtifacts: artifactFixture.privateArtifacts,
+      speechCommitmentLinks: artifactFixture.speechCommitmentLinks,
+      commitmentDivergences: artifactFixture.commitmentDivergences,
       alerts: artifactFixture.alerts,
       interventions: artifactFixture.interventions,
       taskOutputs: artifactFixture.taskOutputs,

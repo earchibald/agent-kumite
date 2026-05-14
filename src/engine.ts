@@ -10,6 +10,7 @@ import {
   type AlertRecord,
   type ArtifactBundle,
   type AwaitRecord,
+  type BenchmarkSummary,
   type Condition,
   type FinalScoreRow,
   type InterventionRecord,
@@ -82,6 +83,7 @@ export interface ArtifactBundleInput {
   manifest: RunManifest;
   roster: readonly RosterEntry[];
   publicEvents: readonly PublicEvent[];
+  benchmarkSummary: BenchmarkSummary;
   structuredCommitments?: readonly StructuredCommitmentEnvelope[];
   privateArtifacts?: ArtifactBundle['privateArtifacts'];
   speechCommitmentLinks?: readonly SpeechCommitmentLinkRecord[];
@@ -582,6 +584,7 @@ export function createArtifactBundle(input: ArtifactBundleInput): ArtifactBundle
   const bundle: ArtifactBundle = {
     manifest: input.manifest,
     replayBundle,
+    benchmarkSummary: input.benchmarkSummary,
     roster: [...input.roster],
     publicEvents: [...input.publicEvents],
     structuredCommitments: [...(input.structuredCommitments ?? [])],

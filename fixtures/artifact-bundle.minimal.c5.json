@@ -76,7 +76,65 @@
         "label": "Approval required for guarded task publish",
         "sourceEventIds": ["evt_r3_task_guard_01"],
         "linkedAwaitId": "await_match_seed_0001_round3_publish"
+      },
+      {
+        "markerId": "marker_alert_approval_pending",
+        "runId": "run_c5_seed_0001",
+        "cursor": { "round": 3, "phase": "task_submission" },
+        "markerType": "alert",
+        "label": "A guarded task publication is waiting for human approval.",
+        "sourceEventIds": ["await_match_seed_0001_round3_publish"]
+      },
+      {
+        "markerId": "marker_divergence_saboteur_task_plan",
+        "runId": "run_c5_seed_0001",
+        "cursor": { "round": 3, "phase": "task_submission" },
+        "markerType": "betrayal",
+        "label": "Speech evidence trace_r3_saboteur_01 is divergent with commitment commit_r3_agent_saboteur_task_plan",
+        "sourceEventIds": ["trace_r3_saboteur_01", "commit_r3_agent_saboteur_task_plan"]
+      },
+      {
+        "markerId": "marker_round3_scores_bookmark",
+        "runId": "run_c5_seed_0001",
+        "cursor": { "round": 3, "phase": "task_submission" },
+        "markerType": "bookmark",
+        "label": "Round 3 paused before score posting",
+        "sourceEventIds": ["snapshot_round3_pause"]
       }
+    ]
+  },
+  "benchmarkSummary": {
+    "runId": "run_c5_seed_0001",
+    "matchId": "match_seed_0001",
+    "condition": "C5",
+    "roundsPlayed": 3,
+    "winnerIds": [],
+    "eliminatedAgentIds": [],
+    "totals": {
+      "publicEvents": 2,
+      "privateArtifacts": 2,
+      "structuredCommitments": 4,
+      "speechCommitmentLinks": 3,
+      "commitmentDivergences": 2,
+      "replayMarkers": 4,
+      "alerts": 1,
+      "interventions": 1
+    },
+    "replayMarkersByType": {
+      "await_open": 1,
+      "alert": 1,
+      "betrayal": 1,
+      "bookmark": 1
+    },
+    "divergenceByOutcome": {
+      "aligned": 1,
+      "divergent": 1
+    },
+    "highlightLabels": [
+      "Approval required for guarded task publish",
+      "A guarded task publication is waiting for human approval.",
+      "Speech evidence trace_r3_saboteur_01 is divergent with commitment commit_r3_agent_saboteur_task_plan",
+      "Round 3 paused before score posting"
     ]
   },
   "roster": [

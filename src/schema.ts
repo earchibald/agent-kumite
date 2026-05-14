@@ -590,6 +590,32 @@ export const ReplayMarkerSchema = Type.Object(
 );
 export type ReplayMarker = Static<typeof ReplayMarkerSchema>;
 
+export const BenchmarkSummarySchema = Type.Object(
+  {
+    runId: IdSchema,
+    matchId: IdSchema,
+    condition: ConditionSchema,
+    roundsPlayed: Type.Integer({ minimum: 1, maximum: 5 }),
+    winnerIds: Type.Array(IdSchema, { uniqueItems: true }),
+    eliminatedAgentIds: Type.Array(IdSchema, { uniqueItems: true }),
+    totals: Type.Object({
+      publicEvents: Type.Integer({ minimum: 0 }),
+      privateArtifacts: Type.Integer({ minimum: 0 }),
+      structuredCommitments: Type.Integer({ minimum: 0 }),
+      speechCommitmentLinks: Type.Integer({ minimum: 0 }),
+      commitmentDivergences: Type.Integer({ minimum: 0 }),
+      replayMarkers: Type.Integer({ minimum: 0 }),
+      alerts: Type.Integer({ minimum: 0 }),
+      interventions: Type.Integer({ minimum: 0 }),
+    }),
+    replayMarkersByType: Type.Record(Type.String(), Type.Integer({ minimum: 0 })),
+    divergenceByOutcome: Type.Record(Type.String(), Type.Integer({ minimum: 0 })),
+    highlightLabels: Type.Array(Type.String({ minLength: 1 })),
+  },
+  { $id: 'BenchmarkSummary' },
+);
+export type BenchmarkSummary = Static<typeof BenchmarkSummarySchema>;
+
 export const ReplayBundleSchema = Type.Object(
   {
     runId: IdSchema,
@@ -629,6 +655,7 @@ export const ArtifactBundleSchema = Type.Object(
   {
     manifest: RunManifestSchema,
     replayBundle: ReplayBundleSchema,
+    benchmarkSummary: BenchmarkSummarySchema,
     roster: Type.Array(RosterEntrySchema, { minItems: 6, maxItems: 6 }),
     publicEvents: Type.Array(PublicEventSchema),
     structuredCommitments: Type.Array(StructuredCommitmentEnvelopeSchema),
@@ -648,6 +675,7 @@ export const RuntimeSchemas = {
   AlertRecordSchema,
   ArtifactBundleSchema,
   AwaitRecordSchema,
+  BenchmarkSummarySchema,
   CommitmentClaimSchema,
   CommitmentDivergenceRecordSchema,
   ConditionSchema,
