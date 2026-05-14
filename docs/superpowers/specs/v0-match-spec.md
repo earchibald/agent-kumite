@@ -44,7 +44,7 @@ Role distribution is fixed at 4 / 1 / 1 for v0. Role assignment per match is uni
 
 ## Round loop
 
-Every round runs the same 9-phase loop in order. Phases are the unit of replay scrubbing and the unit of pressure-director cueing (AK-11). The loop is identical in C4 (observation) and C5 (intervention) runs; intervention affordances (`observation-vs-intervention.md`) attach to specific phases but do not change the order.
+Every round runs the same 9-phase loop in order. Phases are the unit of replay scrubbing and the unit of pressure-director cueing (AK-11). The loop is identical in C4 (observation) and C5 (intervention) runs; intervention affordances (`observation-vs-intervention.md`) attach to specific phases but do not change the order. If an intervention pauses execution, it does so through the canonical `awaiting` contract in `docs/superpowers/specs/awaiting-human-nudge-state.md`; the loop resumes at the paused phase rather than branching into a surface-local lifecycle.
 
 1. **Cast / role / task intro.** Round 1 opens with the full cast intro (AK-10) and role notification; rounds 2–5 open with a one-screen recap of the prior round's resolution.
 2. **Private negotiation.** Each alive agent may issue private DMs up to the round's DM budget (see [DM rules](#dm-rules)).

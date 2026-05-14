@@ -109,7 +109,7 @@ If (6) holds in particular, presentation is no longer downstream of the data mod
 | Swift control room | REC-09, AK-14 |
 | Discord RBAC and audit | REC-10, AK-15 |
 | ACP client / orchestration layer / multi-session match mapping | FOLLOWUPS "Architecture and implementation" 1–4, 8 |
-| `awaiting` as canonical human-nudge state | REC-12, AK-12 |
+| `awaiting` as canonical human-nudge state | REC-12, AK-12, `docs/superpowers/specs/awaiting-human-nudge-state.md` |
 
 ## Reconciliation with existing artifacts
 

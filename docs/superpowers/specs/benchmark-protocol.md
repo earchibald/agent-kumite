@@ -233,7 +233,7 @@ Reporting rules are fixed:
 | Typed commitment schema and event model | AK-7 |
 | Referee grimoire operator telemetry channel | AK-8 |
 | Task corpus contents and task-specific rubrics | AK-9 |
-| `awaiting` pause/resume mechanism for operator interaction | AK-12 |
+| `awaiting` pause/resume mechanism for operator interaction | AK-12, `docs/superpowers/specs/awaiting-human-nudge-state.md` |
 | Swift / Discord benchmark surfaces | AK-14 / AK-15 |
 
 ## Cross-references
