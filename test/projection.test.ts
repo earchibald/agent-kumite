@@ -26,6 +26,7 @@ describe('control-room projections', () => {
     const taskSubmissionSnapshot = projection.layeredSnapshots.find(
       (snapshot) => snapshot.cursor.round === 3 && snapshot.cursor.phase === 'task_submission',
     );
+    const alertMarker = projection.replay.markers.find((marker) => marker.markerId === 'marker_alert_approval_pending');
 
     expect(projection.home.condition).toBe('C5');
     expect(projection.home.currentCursor).toEqual({ round: 3, phase: 'simultaneous_reveal' });
@@ -41,6 +42,8 @@ describe('control-room projections', () => {
       'freeze',
       'ejection',
     ]);
+    expect(alertMarker?.cursor).toEqual({ round: 3, phase: 'task_submission' });
+    expect(projection.replay.snapshots).toHaveLength(artifactFixture.replayBundle.snapshots.length);
     expect(projection.aftermath.runId).toBe(artifactFixture.manifest.runId);
   });
 
@@ -55,6 +58,8 @@ describe('control-room projections', () => {
 
     expect(written.home.runId).toBe('run_c5_seed_0001');
     expect(written.replay.markerCount).toBe(artifactFixture.replayBundle.markers.length);
+    expect(written.replay.markers).toHaveLength(artifactFixture.replayBundle.markers.length);
+    expect(written.replay.snapshots).toHaveLength(artifactFixture.replayBundle.snapshots.length);
     expect(written.layeredSnapshots).toHaveLength(artifactFixture.replayBundle.timeline.length);
     expect(written.aftermath.replayMarkerSummary.total).toBe(artifactFixture.replayBundle.markers.length);
   });

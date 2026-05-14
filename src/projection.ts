@@ -64,6 +64,25 @@ export interface LayeredCursorSnapshot {
   };
 }
 
+export interface ControlRoomReplaySnapshot {
+  snapshotId: string;
+  cursor: PhaseCursor;
+  capturedAt: string;
+  aliveAgentIds: string[];
+  eliminatedAgentIds: string[];
+  openAwaitIds: string[];
+  scoreByAgent: Record<string, number>;
+}
+
+export interface ControlRoomReplayMarker {
+  markerId: string;
+  cursor: PhaseCursor;
+  markerType: ReplayMarker['markerType'];
+  label: string;
+  sourceRecordIds: string[];
+  linkedAwaitId: string | null;
+}
+
 export interface ControlRoomProjection {
   manifest: ArtifactBundle['manifest'];
   benchmarkSummary: ArtifactBundle['benchmarkSummary'];
@@ -71,6 +90,9 @@ export interface ControlRoomProjection {
   callsheet: CallsheetRow[];
   layeredSnapshots: LayeredCursorSnapshot[];
   replay: {
+    timeline: PhaseCursor[];
+    snapshots: ControlRoomReplaySnapshot[];
+    markers: ControlRoomReplayMarker[];
     snapshotCount: number;
     markerCount: number;
     markerIds: string[];
@@ -228,6 +250,32 @@ function buildHomeSummary(bundle: ArtifactBundle): ControlRoomHomeSummary {
   };
 }
 
+function buildReplayProjection(bundle: ArtifactBundle): ControlRoomProjection['replay'] {
+  return {
+    timeline: bundle.replayBundle.timeline.map((cursor) => ({ ...cursor })),
+    snapshots: bundle.replayBundle.snapshots.map((snapshot) => ({
+      snapshotId: snapshot.snapshotId,
+      cursor: { ...snapshot.cursor },
+      capturedAt: snapshot.capturedAt,
+      aliveAgentIds: [...snapshot.state.aliveAgentIds],
+      eliminatedAgentIds: [...snapshot.state.eliminatedAgentIds],
+      openAwaitIds: [...snapshot.state.openAwaitIds],
+      scoreByAgent: { ...snapshot.state.scoreByAgent },
+    })),
+    markers: bundle.replayBundle.markers.map((marker) => ({
+      markerId: marker.markerId,
+      cursor: { ...marker.cursor },
+      markerType: marker.markerType,
+      label: marker.label,
+      sourceRecordIds: [...marker.sourceEventIds],
+      linkedAwaitId: marker.linkedAwaitId ?? null,
+    })),
+    snapshotCount: bundle.replayBundle.snapshots.length,
+    markerCount: bundle.replayBundle.markers.length,
+    markerIds: bundle.replayBundle.markers.map((marker) => marker.markerId),
+  };
+}
+
 export function createControlRoomProjection(bundle: ArtifactBundle): ControlRoomProjection {
   return {
     manifest: bundle.manifest,
@@ -235,11 +283,7 @@ export function createControlRoomProjection(bundle: ArtifactBundle): ControlRoom
     home: buildHomeSummary(bundle),
     callsheet: buildCallsheet(bundle),
     layeredSnapshots: buildLayeredSnapshots(bundle),
-    replay: {
-      snapshotCount: bundle.replayBundle.snapshots.length,
-      markerCount: bundle.replayBundle.markers.length,
-      markerIds: bundle.replayBundle.markers.map((marker) => marker.markerId),
-    },
+    replay: buildReplayProjection(bundle),
     aftermath: createAftermathReport(bundle),
   };
 }
