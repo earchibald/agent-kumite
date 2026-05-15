@@ -12,6 +12,7 @@ import {
   LiveIngestionSocketServer,
   parseLiveIngestionSocketFollowCliArgs,
   serializeAcpLiveRunStore,
+  writeReplayLabHelpersFromFile,
   type AcpIngressEnvelope,
   type RosterEntry,
   type RunManifest,
@@ -56,6 +57,14 @@ describe('live ingestion socket follow cli lib', () => {
       '/tmp/store.json',
       '--projection-output',
       '/tmp/projection.json',
+      '--replay-output',
+      '/tmp/replay-lab.json',
+      '--marker',
+      'marker_round3_await_open',
+      '--from',
+      '3:public_square',
+      '--to',
+      '3:task_submission',
       '--max-reconnects',
       '2',
       '--reconnect-delay-ms',
@@ -66,6 +75,10 @@ describe('live ingestion socket follow cli lib', () => {
 
     expect(parsed.storeOutputPath).toBe('/tmp/store.json');
     expect(parsed.projectionOutputPath).toBe('/tmp/projection.json');
+    expect(parsed.replayOutputPath).toBe('/tmp/replay-lab.json');
+    expect(parsed.markerId).toBe('marker_round3_await_open');
+    expect(parsed.fromCursor).toBe('3:public_square');
+    expect(parsed.toCursor).toBe('3:task_submission');
     expect(parsed.maxReconnects).toBe(2);
     expect(parsed.reconnectDelayMs).toBe(10);
     expect(parsed.snapshotLimit).toBe(3);
@@ -76,6 +89,8 @@ describe('live ingestion socket follow cli lib', () => {
     const socketPath = join(dir, 'live.sock');
     const storeOutputPath = join(dir, 'store.snapshot.json');
     const projectionOutputPath = join(dir, 'projection.snapshot.json');
+    const replayOutputPath = join(dir, 'replay.snapshot.json');
+    const expectedReplayOutputPath = join(dir, 'replay.expected.json');
     const baseStore = createAcpLiveRunStore({ manifest, roster });
     server = new LiveIngestionSocketServer({
       socketPath,
@@ -88,6 +103,7 @@ describe('live ingestion socket follow cli lib', () => {
       runId: manifest.runId,
       storeOutputPath,
       projectionOutputPath,
+      replayOutputPath,
       pretty: true,
       reconnectDelayMs: 10,
       maxReconnects: 0,
@@ -107,11 +123,21 @@ describe('live ingestion socket follow cli lib', () => {
     const result = await followPromise;
     const mirroredStore = JSON.parse(await readFile(storeOutputPath, 'utf8'));
     const mirroredProjection = JSON.parse(await readFile(projectionOutputPath, 'utf8'));
+    const mirroredReplay = JSON.parse(await readFile(replayOutputPath, 'utf8'));
+
+    await writeReplayLabHelpersFromFile({
+      inputPath: projectionOutputPath,
+      outputPath: expectedReplayOutputPath,
+      pretty: true,
+    });
+    const expectedReplay = JSON.parse(await readFile(expectedReplayOutputPath, 'utf8'));
 
     expect(result.terminationReason).toBe('snapshot_limit_reached');
     expect(result.mirroredSnapshotCount).toBe(2);
+    expect(result.replayOutputPath).toBe(replayOutputPath);
     expect(mirroredStore.state.snapshots.length).toBeGreaterThan(0);
     expect(mirroredProjection.home.currentCursor).toEqual(mirroredStore.state.matchState.current);
+    expect(mirroredReplay).toEqual(expectedReplay);
   });
 
   it('reconnects after server shutdown when configured', async () => {

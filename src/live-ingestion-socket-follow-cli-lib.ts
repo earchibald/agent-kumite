@@ -12,6 +12,7 @@ import {
   type LiveIngestionSocketProtocolError,
 } from './live-ingestion-socket-client.js';
 import { writeLiveControlRoomProjectionToFile } from './live-projection-file.js';
+import { writeReplayLabHelpersFromFile } from './replay-cli-lib.js';
 import type { PersistedAcpLiveRunStore } from './schema.js';
 
 export interface LiveIngestionSocketFollowCliOptions {
@@ -19,6 +20,10 @@ export interface LiveIngestionSocketFollowCliOptions {
   runId: string;
   storeOutputPath?: string;
   projectionOutputPath?: string;
+  replayOutputPath?: string;
+  markerId?: string;
+  fromCursor?: string;
+  toCursor?: string;
   pretty: boolean;
   reconnectDelayMs: number;
   maxReconnects: number;
@@ -28,6 +33,7 @@ export interface LiveIngestionSocketFollowCliOptions {
 export interface LiveIngestionSocketFollowCliResult {
   storeOutputPath?: string;
   projectionOutputPath?: string;
+  replayOutputPath?: string;
   mirroredSnapshotCount: number;
   reconnectCount: number;
   terminationReason: 'snapshot_limit_reached' | 'server_stopping' | 'reconnect_exhausted';
@@ -40,6 +46,10 @@ export function parseLiveIngestionSocketFollowCliArgs(
   let runId: string | undefined;
   let storeOutputPath: string | undefined;
   let projectionOutputPath: string | undefined;
+  let replayOutputPath: string | undefined;
+  let markerId: string | undefined;
+  let fromCursor: string | undefined;
+  let toCursor: string | undefined;
   let pretty = false;
   let reconnectDelayMs = 250;
   let maxReconnects = 0;
@@ -71,6 +81,30 @@ export function parseLiveIngestionSocketFollowCliArgs(
 
     if (arg === '--projection-output') {
       projectionOutputPath = args[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--replay-output') {
+      replayOutputPath = args[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--marker') {
+      markerId = args[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--from') {
+      fromCursor = args[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--to') {
+      toCursor = args[index + 1];
       index += 1;
       continue;
     }
@@ -112,12 +146,22 @@ export function parseLiveIngestionSocketFollowCliArgs(
   if (!storeOutputPath && !projectionOutputPath) {
     throw new Error('missing required output: use --store-output <live-run-store.json>, --projection-output <live-control-room.json>, or both');
   }
+  if (replayOutputPath && !projectionOutputPath) {
+    throw new Error('--replay-output <replay-lab.json> requires --projection-output <live-control-room.json>');
+  }
+  if (!replayOutputPath && (markerId || fromCursor || toCursor)) {
+    throw new Error('--marker, --from, and --to require --replay-output <replay-lab.json>');
+  }
 
   return {
     socketPath: resolve(socketPath),
     runId,
     ...(storeOutputPath ? { storeOutputPath: resolve(storeOutputPath) } : {}),
     ...(projectionOutputPath ? { projectionOutputPath: resolve(projectionOutputPath) } : {}),
+    ...(replayOutputPath ? { replayOutputPath: resolve(replayOutputPath) } : {}),
+    ...(markerId ? { markerId } : {}),
+    ...(fromCursor ? { fromCursor } : {}),
+    ...(toCursor ? { toCursor } : {}),
     pretty,
     reconnectDelayMs,
     maxReconnects,
@@ -156,6 +200,16 @@ async function mirrorSnapshot(
       options.pretty,
     );
   }
+  if (options.replayOutputPath && options.projectionOutputPath) {
+    await writeReplayLabHelpersFromFile({
+      inputPath: options.projectionOutputPath,
+      outputPath: options.replayOutputPath,
+      ...(options.markerId ? { markerId: options.markerId } : {}),
+      ...(options.fromCursor ? { fromCursor: options.fromCursor } : {}),
+      ...(options.toCursor ? { toCursor: options.toCursor } : {}),
+      pretty: options.pretty,
+    });
+  }
 }
 
 function shouldReconnect(error: unknown): boolean {
@@ -180,6 +234,7 @@ export async function followLiveIngestionSocketSnapshots(
   ): LiveIngestionSocketFollowCliResult => ({
     ...(options.storeOutputPath ? { storeOutputPath: options.storeOutputPath } : {}),
     ...(options.projectionOutputPath ? { projectionOutputPath: options.projectionOutputPath } : {}),
+    ...(options.replayOutputPath ? { replayOutputPath: options.replayOutputPath } : {}),
     mirroredSnapshotCount,
     reconnectCount,
     terminationReason,
@@ -243,5 +298,5 @@ export async function followLiveIngestionSocketSnapshots(
 }
 
 export function liveIngestionSocketFollowUsageText(): string {
-  return 'Usage: agent-kumite-live-follow --socket <live-ingestion.sock> --run-id <run-id> (--store-output <live-run-store.json> | --projection-output <live-control-room.json> | both) [--pretty] [--reconnect-delay-ms <ms>] [--max-reconnects <count>] [--snapshot-limit <count>]';
+  return 'Usage: agent-kumite-live-follow --socket <live-ingestion.sock> --run-id <run-id> (--store-output <live-run-store.json> | --projection-output <live-control-room.json> | both) [--replay-output <replay-lab.json> --marker <marker-id> --from <round:phase> --to <round:phase>] [--pretty] [--reconnect-delay-ms <ms>] [--max-reconnects <count>] [--snapshot-limit <count>]';
 }

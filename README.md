@@ -87,7 +87,7 @@ That adds:
 | `npm run live-stream-runtime` | Run one deterministic harness input and stream its ACP ingress directly into the daemon | stdout summary JSON |
 | `npm run live-bundle` | Run the one-command local live workflow: seed daemon, mirror outputs, stream the deterministic run, and optionally emit replay helpers | mirrored JSON files + summary JSON |
 | `npm run live-inspect` | Inspect or drive the live-ingestion daemon with one-shot requests or a bounded subscription stream | stdout JSON / NDJSON |
-| `npm run live-follow` | Follow one run over the socket and keep local store/projection snapshot files mirrored | mirrored JSON files |
+| `npm run live-follow` | Follow one run over the socket and keep local store/projection/replay snapshot files mirrored | mirrored JSON files |
 | `npm run replay` | Derive replay-lab marker-jump and snapshot-diff helpers from projected control-room JSON | `replay-lab.json` |
 
 The underlying CLI contracts are:
@@ -108,7 +108,7 @@ agent-kumite-live-export-acp --input <match.json> --output <acp-ingress.json|ndj
 agent-kumite-live-stream-runtime --input <match.json> --socket <live-ingestion.sock> --run-id <run-id> [--batch-size <count>] [--request-id-prefix <prefix>]
 agent-kumite-live-bundle --input <match.json> --store-output <live-run-store.json> --projection-output <live-control-room.json> [--replay-output <replay-lab.json> --marker <marker-id> --from <round:phase> --to <round:phase>] [--socket <live-ingestion.sock>] [--batch-size <count>] [--request-id-prefix <prefix>] [--pretty]
 agent-kumite-live-inspect <get-store|get-projection|append-ingress|subscribe> --socket <live-ingestion.sock> --run-id <run-id> [--request-id <id>] [--pretty] [--ingress <acp-ingress.json>] [--event <store_updated|server_stopping>] [--initial-snapshot <none|store|projection>] [--limit <count>]
-agent-kumite-live-follow --socket <live-ingestion.sock> --run-id <run-id> (--store-output <live-run-store.json> | --projection-output <live-control-room.json> | both) [--pretty] [--reconnect-delay-ms <ms>] [--max-reconnects <count>] [--snapshot-limit <count>]
+agent-kumite-live-follow --socket <live-ingestion.sock> --run-id <run-id> (--store-output <live-run-store.json> | --projection-output <live-control-room.json> | both) [--replay-output <replay-lab.json> --marker <marker-id> --from <round:phase> --to <round:phase>] [--pretty] [--reconnect-delay-ms <ms>] [--max-reconnects <count>] [--snapshot-limit <count>]
 agent-kumite-replay --input <control-room.json> --output <replay-lab.json> [--marker <marker-id>] [--from <round:phase>] [--to <round:phase>] [--pretty]
 ```
 
@@ -339,6 +339,7 @@ npm run live-follow -- \
   --run-id run_demo_c5_seed_0001 \
   --store-output out/live/run-store.mirror.json \
   --projection-output out/live/control-room.mirror.json \
+  --replay-output out/live/replay-lab.mirror.json \
   --snapshot-limit 2 \
   --pretty
 ```
@@ -346,7 +347,7 @@ npm run live-follow -- \
 Use this when you want:
 
 - deterministic bootstrap from the canonical live store snapshot
-- a local store mirror plus a derived control-room mirror without hand-written socket glue
+- a local store mirror plus derived control-room and replay-helper mirrors without hand-written socket glue
 - reconnect-aware local snapshot followers for downstream tooling
 
 ### 6. Run a small benchmark batch locally
