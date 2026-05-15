@@ -15,6 +15,7 @@ This repo lets you:
 - bridge ACP-style incremental ingress into that live socket from stdin or file
 - export deterministic harness runs into ACP ingress JSON/NDJSON for the live runtime stack
 - stream deterministic harness runs directly into the live socket daemon without an intermediate export file
+- bundle daemon startup, follow mirroring, and deterministic runtime streaming into one command
 - query and inspect the live-ingestion daemon through reusable client helpers and a CLI
 - mirror daemon-backed live store/projection snapshots to local files with a follow CLI
 - generate replay-lab helper outputs such as marker jumps and snapshot diffs
@@ -84,6 +85,7 @@ That adds:
 | `npm run live-bridge` | Feed ACP ingress incrementally into the live socket from NDJSON or JSON-array input | stdout summary JSON |
 | `npm run live-export-acp` | Export one deterministic harness run as ACP ingress JSON-array or NDJSON | `acp-ingress.json` / `acp-ingress.ndjson` |
 | `npm run live-stream-runtime` | Run one deterministic harness input and stream its ACP ingress directly into the daemon | stdout summary JSON |
+| `npm run live-bundle` | Run the one-command local live workflow: seed daemon, mirror outputs, and stream the deterministic run | mirrored JSON files + summary JSON |
 | `npm run live-inspect` | Inspect or drive the live-ingestion daemon with one-shot requests or a bounded subscription stream | stdout JSON / NDJSON |
 | `npm run live-follow` | Follow one run over the socket and keep local store/projection snapshot files mirrored | mirrored JSON files |
 | `npm run replay` | Derive replay-lab marker-jump and snapshot-diff helpers from projected control-room JSON | `replay-lab.json` |
@@ -104,6 +106,7 @@ agent-kumite-live-socket --socket <live-ingestion.sock> --store-input <live-run-
 agent-kumite-live-bridge --socket <live-ingestion.sock> --run-id <run-id> [--input <acp-ingress.ndjson|json>] [--input-format <ndjson|json-array>] [--batch-size <count>] [--request-id-prefix <prefix>]
 agent-kumite-live-export-acp --input <match.json> --output <acp-ingress.json|ndjson> [--output-format <json-array|ndjson>] [--pretty]
 agent-kumite-live-stream-runtime --input <match.json> --socket <live-ingestion.sock> --run-id <run-id> [--batch-size <count>] [--request-id-prefix <prefix>]
+agent-kumite-live-bundle --input <match.json> --store-output <live-run-store.json> --projection-output <live-control-room.json> [--socket <live-ingestion.sock>] [--batch-size <count>] [--request-id-prefix <prefix>] [--pretty]
 agent-kumite-live-inspect <get-store|get-projection|append-ingress|subscribe> --socket <live-ingestion.sock> --run-id <run-id> [--request-id <id>] [--pretty] [--ingress <acp-ingress.json>] [--event <store_updated|server_stopping>] [--initial-snapshot <none|store|projection>] [--limit <count>]
 agent-kumite-live-follow --socket <live-ingestion.sock> --run-id <run-id> (--store-output <live-run-store.json> | --projection-output <live-control-room.json> | both) [--pretty] [--reconnect-delay-ms <ms>] [--max-reconnects <count>] [--snapshot-limit <count>]
 agent-kumite-replay --input <control-room.json> --output <replay-lab.json> [--marker <marker-id>] [--from <round:phase>] [--to <round:phase>] [--pretty]
@@ -304,6 +307,24 @@ Use this when you want:
 - the shortest deterministic runtime -> live daemon path
 - explicit run targeting and stable request ids without a temporary ingress file
 - parity with the AK-51 export path while reducing operational steps
+
+If you want the shortest operator-facing local live workflow:
+
+```bash
+npm run live-bundle -- \
+  --input fixtures/demo-match.input.json \
+  --store-output out/live/runtime.store.json \
+  --projection-output out/live/runtime.projection.json \
+  --batch-size 1 \
+  --request-id-prefix runtime_bundle \
+  --pretty
+```
+
+Use this when you want:
+
+- one command instead of manually starting the daemon, follow mirror, and runtime stream
+- the same canonical mirrored store/projection outputs as the explicit multi-step flow
+- a practical local operator path for deterministic live demos
 
 If you want to keep local mirror files in sync with the daemon:
 
