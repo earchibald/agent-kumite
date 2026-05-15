@@ -12,8 +12,12 @@ import type { LiveControlRoomProjection } from './projection.js';
 
 const PROTOCOL_VERSION = 1;
 
-type RequestType = 'append_ingress' | 'get_store' | 'get_projection';
-type ResponseType = 'append_ingress_ok' | 'get_store_ok' | 'get_projection_ok' | 'error';
+type OneShotRequestType = 'append_ingress' | 'get_store' | 'get_projection';
+type RequestType = OneShotRequestType | 'subscribe_run';
+type ResponseType = 'append_ingress_ok' | 'get_store_ok' | 'get_projection_ok' | 'subscribed' | 'error';
+type SubscriptionEventType = 'store_updated' | 'server_stopping' | 'store_snapshot' | 'projection_snapshot' | 'stream_error';
+type SubscriptionFilterType = 'store_updated' | 'server_stopping';
+type InitialSnapshotMode = 'none' | 'store' | 'projection';
 
 export interface LiveSocketRequest {
   protocol_version: number;
@@ -43,11 +47,20 @@ export interface LiveSocketErrorResponse {
   };
 }
 
+export interface LiveSocketSubscriptionEvent {
+  protocol_version: number;
+  type: SubscriptionEventType;
+  run_id: string;
+  payload: Record<string, unknown>;
+}
+
 export type LiveSocketResponse = LiveSocketSuccessResponse | LiveSocketErrorResponse;
+export type LiveSocketServerMessage = LiveSocketResponse | LiveSocketSubscriptionEvent;
 
 export interface LiveIngestionSocketServerOptions {
   socketPath: string;
   initialStores?: readonly AcpLiveRunStore[];
+  subscriberQueueCapacity?: number;
 }
 
 interface StoredResponseEntry {
@@ -55,7 +68,17 @@ interface StoredResponseEntry {
   response: LiveSocketResponse;
 }
 
-function encodeMessage(message: LiveSocketResponse): string {
+interface Subscriber {
+  socket: net.Socket;
+  runId: string;
+  requestedEvents: Set<SubscriptionFilterType>;
+  queue: string[];
+  flushing: boolean;
+  closed: boolean;
+  initialSnapshot: InitialSnapshotMode;
+}
+
+function encodeMessage(message: LiveSocketServerMessage): string {
   return `${JSON.stringify(message)}\n`;
 }
 
@@ -83,7 +106,12 @@ function parseRequest(line: string): LiveSocketRequest {
     throw new Error('unsupported protocol version');
   }
 
-  if (type !== 'append_ingress' && type !== 'get_store' && type !== 'get_projection') {
+  if (
+    type !== 'append_ingress'
+    && type !== 'get_store'
+    && type !== 'get_projection'
+    && type !== 'subscribe_run'
+  ) {
     throw new Error('unknown request type');
   }
 
@@ -108,6 +136,31 @@ function parseRequest(line: string): LiveSocketRequest {
   };
 }
 
+function parseSubscriptionFilterEvents(value: unknown): Set<SubscriptionFilterType> {
+  if (!Array.isArray(value)) {
+    throw new Error('subscribe_run payload.events must be an array');
+  }
+
+  const events = new Set<SubscriptionFilterType>();
+  for (const item of value) {
+    if (item !== 'store_updated' && item !== 'server_stopping') {
+      throw new Error(`unsupported subscribe_run event ${String(item)}`);
+    }
+    events.add(item);
+  }
+  return events;
+}
+
+function parseInitialSnapshotMode(value: unknown): InitialSnapshotMode {
+  if (value === undefined) {
+    return 'none';
+  }
+  if (value === 'none' || value === 'store' || value === 'projection') {
+    return value;
+  }
+  throw new Error('subscribe_run payload.initial_snapshot must be one of none, store, projection');
+}
+
 export class LiveIngestionSocketServer {
   private readonly socketPath: string;
 
@@ -117,10 +170,17 @@ export class LiveIngestionSocketServer {
 
   private readonly appendRequestCache = new Map<string, StoredResponseEntry>();
 
+  private readonly subscribersByRun = new Map<string, Set<Subscriber>>();
+
+  private readonly subscriberQueueCapacity: number;
+
   private server: net.Server | null = null;
+
+  private stopping = false;
 
   constructor(options: LiveIngestionSocketServerOptions) {
     this.socketPath = options.socketPath;
+    this.subscriberQueueCapacity = options.subscriberQueueCapacity ?? 64;
     for (const store of options.initialStores ?? []) {
       this.registerStore(store);
     }
@@ -136,6 +196,7 @@ export class LiveIngestionSocketServer {
       throw new Error('live ingestion socket server already started');
     }
 
+    this.stopping = false;
     await unlink(this.socketPath).catch((error: NodeJS.ErrnoException) => {
       if (error.code !== 'ENOENT') {
         throw error;
@@ -153,6 +214,9 @@ export class LiveIngestionSocketServer {
     if (!this.server) {
       return;
     }
+
+    this.stopping = true;
+    this.broadcastServerStopping();
 
     const server = this.server;
     this.server = null;
@@ -198,16 +262,26 @@ export class LiveIngestionSocketServer {
     let request: LiveSocketRequest;
     try {
       request = parseRequest(line);
-    } catch (error) {
+    } catch {
       socket.end();
       return;
     }
 
-    const response = this.handleRequest(request);
+    if (this.stopping) {
+      socket.end(encodeMessage(this.errorResponse(request, 'server_stopping', 'server is shutting down', true)));
+      return;
+    }
+
+    if (request.type === 'subscribe_run') {
+      this.handleSubscribe(socket, request);
+      return;
+    }
+
+    const response = this.handleOneShotRequest(request);
     socket.end(encodeMessage(response));
   }
 
-  private handleRequest(request: LiveSocketRequest): LiveSocketResponse {
+  private handleOneShotRequest(request: LiveSocketRequest): LiveSocketResponse {
     if (request.type === 'append_ingress') {
       return this.handleAppendIngress(request);
     }
@@ -217,6 +291,59 @@ export class LiveIngestionSocketServer {
     }
 
     return this.handleGetProjection(request);
+  }
+
+  private handleSubscribe(socket: net.Socket, request: LiveSocketRequest): void {
+    const store = this.stores.get(request.run_id);
+    if (!store) {
+      socket.end(encodeMessage(this.errorResponse(request, 'unknown_run', `unknown run ${request.run_id}`, false)));
+      return;
+    }
+
+    let requestedEvents: Set<SubscriptionFilterType>;
+    let initialSnapshot: InitialSnapshotMode;
+    try {
+      requestedEvents = parseSubscriptionFilterEvents(request.payload.events);
+      initialSnapshot = parseInitialSnapshotMode(request.payload.initial_snapshot);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      socket.end(encodeMessage(this.errorResponse(request, 'invalid_payload', message, false)));
+      return;
+    }
+
+    const subscriber: Subscriber = {
+      socket,
+      runId: request.run_id,
+      requestedEvents,
+      queue: [],
+      flushing: false,
+      closed: false,
+      initialSnapshot,
+    };
+    const runSubscribers = this.subscribersByRun.get(request.run_id) ?? new Set<Subscriber>();
+    runSubscribers.add(subscriber);
+    this.subscribersByRun.set(request.run_id, runSubscribers);
+
+    socket.on('close', () => this.removeSubscriber(subscriber));
+    socket.on('error', () => this.removeSubscriber(subscriber));
+
+    this.enqueueSubscriberMessage(subscriber, {
+      protocol_version: PROTOCOL_VERSION,
+      type: 'subscribed',
+      request_id: request.request_id,
+      run_id: request.run_id,
+      payload: {
+        events: [...requestedEvents],
+        initial_snapshot: initialSnapshot,
+        current_store_revision: this.storeRevisions.get(request.run_id) ?? 0,
+      },
+    });
+
+    if (initialSnapshot === 'store') {
+      this.enqueueSubscriberMessage(subscriber, this.storeSnapshotEvent(request.run_id, store));
+    } else if (initialSnapshot === 'projection') {
+      this.enqueueSubscriberMessage(subscriber, this.projectionSnapshotEvent(request.run_id, store));
+    }
   }
 
   private handleAppendIngress(request: LiveSocketRequest): LiveSocketResponse {
@@ -235,7 +362,12 @@ export class LiveIngestionSocketServer {
     const cached = this.appendRequestCache.get(cacheKey);
     if (cached) {
       if (cached.payloadKey !== nextPayloadKey) {
-        return this.errorResponse(request, 'request_id_conflict', `request_id ${request.request_id} was already used with a different payload`, false);
+        return this.errorResponse(
+          request,
+          'request_id_conflict',
+          `request_id ${request.request_id} was already used with a different payload`,
+          false,
+        );
       }
       return cached.response;
     }
@@ -261,6 +393,7 @@ export class LiveIngestionSocketServer {
       },
     };
     this.appendRequestCache.set(cacheKey, { payloadKey: nextPayloadKey, response });
+    this.publishStoreUpdated(request.run_id, updatedStore, nextRevision);
     return response;
   }
 
@@ -300,6 +433,152 @@ export class LiveIngestionSocketServer {
         projection,
       },
     };
+  }
+
+  private publishStoreUpdated(runId: string, store: AcpLiveRunStore, storeRevision: number): void {
+    const subscribers = this.subscribersByRun.get(runId);
+    if (!subscribers) {
+      return;
+    }
+
+    const event: LiveSocketSubscriptionEvent = {
+      protocol_version: PROTOCOL_VERSION,
+      type: 'store_updated',
+      run_id: runId,
+      payload: {
+        store_revision: storeRevision,
+        latest_cursor: store.state.matchState.current,
+        open_await_count: store.state.matchState.openAwaitIds.length,
+        projection_dirty: true,
+      },
+    };
+
+    for (const subscriber of subscribers) {
+      if (subscriber.requestedEvents.has('store_updated')) {
+        this.enqueueSubscriberMessage(subscriber, event);
+      }
+    }
+  }
+
+  private broadcastServerStopping(): void {
+    for (const [, subscribers] of this.subscribersByRun) {
+      for (const subscriber of subscribers) {
+        this.enqueueSubscriberMessage(subscriber, {
+          protocol_version: PROTOCOL_VERSION,
+          type: 'server_stopping',
+          run_id: subscriber.runId,
+          payload: {
+            code: 'server_stopping',
+            message: 'server is shutting down',
+            retryable: true,
+          },
+        });
+        subscriber.socket.end();
+      }
+    }
+  }
+
+  private storeSnapshotEvent(runId: string, store: AcpLiveRunStore): LiveSocketSubscriptionEvent {
+    return {
+      protocol_version: PROTOCOL_VERSION,
+      type: 'store_snapshot',
+      run_id: runId,
+      payload: {
+        store_revision: this.storeRevisions.get(runId) ?? 0,
+        store: serializeAcpLiveRunStore(store),
+      },
+    };
+  }
+
+  private projectionSnapshotEvent(runId: string, store: AcpLiveRunStore): LiveSocketSubscriptionEvent {
+    return {
+      protocol_version: PROTOCOL_VERSION,
+      type: 'projection_snapshot',
+      run_id: runId,
+      payload: {
+        store_revision: this.storeRevisions.get(runId) ?? 0,
+        projection: currentAcpLiveControlRoomProjection(store),
+      },
+    };
+  }
+
+  private enqueueSubscriberMessage(subscriber: Subscriber, message: LiveSocketServerMessage): void {
+    if (subscriber.closed) {
+      return;
+    }
+
+    if (subscriber.queue.length >= this.subscriberQueueCapacity) {
+      this.sendStreamError(subscriber, 'slow_subscriber', 'subscriber queue exceeded capacity', true);
+      return;
+    }
+
+    subscriber.queue.push(encodeMessage(message));
+    this.flushSubscriber(subscriber);
+  }
+
+  private flushSubscriber(subscriber: Subscriber): void {
+    if (subscriber.flushing || subscriber.closed) {
+      return;
+    }
+
+    subscriber.flushing = true;
+    const writeNext = (): void => {
+      if (subscriber.closed) {
+        subscriber.flushing = false;
+        return;
+      }
+
+      const next = subscriber.queue.shift();
+      if (!next) {
+        subscriber.flushing = false;
+        return;
+      }
+
+      const writable = subscriber.socket.write(next);
+      if (writable) {
+        setImmediate(writeNext);
+        return;
+      }
+
+      subscriber.socket.once('drain', writeNext);
+    };
+    writeNext();
+  }
+
+  private sendStreamError(subscriber: Subscriber, code: string, message: string, retryable: boolean): void {
+    if (subscriber.closed) {
+      return;
+    }
+
+    subscriber.socket.write(encodeMessage({
+      protocol_version: PROTOCOL_VERSION,
+      type: 'stream_error',
+      run_id: subscriber.runId,
+      payload: {
+        code,
+        message,
+        retryable,
+      },
+    }));
+    subscriber.socket.end();
+    this.removeSubscriber(subscriber);
+  }
+
+  private removeSubscriber(subscriber: Subscriber): void {
+    if (subscriber.closed) {
+      return;
+    }
+
+    subscriber.closed = true;
+    const subscribers = this.subscribersByRun.get(subscriber.runId);
+    if (!subscribers) {
+      return;
+    }
+
+    subscribers.delete(subscriber);
+    if (subscribers.size === 0) {
+      this.subscribersByRun.delete(subscriber.runId);
+    }
   }
 
   private errorResponse(

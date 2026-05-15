@@ -46,6 +46,57 @@ async function sendOneShot(socketPath: string, message: Record<string, unknown>)
   });
 }
 
+async function openSubscription(
+  socketPath: string,
+  message: Record<string, unknown>,
+): Promise<{ socket: net.Socket; nextMessage: () => Promise<Record<string, unknown>> }> {
+  const socket = net.createConnection(socketPath);
+  let buffer = '';
+  const pending: Array<(value: Record<string, unknown>) => void> = [];
+  const received: Record<string, unknown>[] = [];
+
+  socket.setEncoding('utf8');
+  socket.on('data', (chunk: string) => {
+    buffer += chunk;
+    while (true) {
+      const newlineIndex = buffer.indexOf('\n');
+      if (newlineIndex === -1) {
+        break;
+      }
+
+      const line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+      const nextMessage = JSON.parse(line) as Record<string, unknown>;
+      const resolver = pending.shift();
+      if (resolver) {
+        resolver(nextMessage);
+      } else {
+        received.push(nextMessage);
+      }
+    }
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    socket.once('error', reject);
+    socket.once('connect', () => {
+      socket.write(`${JSON.stringify(message)}\n`);
+      resolve();
+    });
+  });
+
+  return {
+    socket,
+    nextMessage: () => {
+      const next = received.shift();
+      if (next) {
+        return Promise.resolve(next);
+      }
+
+      return new Promise<Record<string, unknown>>((resolve) => pending.push(resolve));
+    },
+  };
+}
+
 describe('live ingestion socket server', () => {
   const manifest = readFixture<RunManifest>('run-manifest.live.c5.json');
   const roster = readFixture<RosterEntry[]>('roster.demo.json');
@@ -151,5 +202,125 @@ describe('live ingestion socket server', () => {
     expect(second).toEqual(first);
     expect(conflicting.type).toBe('error');
     expect((conflicting.payload as { code: string }).code).toBe('request_id_conflict');
+  });
+
+  it('streams subscribed, initial snapshots, and store_updated events for subscribe_run', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agent-kumite-live-socket-'));
+    const socketPath = join(dir, 'live.sock');
+    server = new LiveIngestionSocketServer({
+      socketPath,
+      initialStores: [
+        createAcpLiveRunStore({ manifest, roster }),
+      ],
+    });
+    await server.start();
+
+    const subscription = await openSubscription(socketPath, {
+      protocol_version: 1,
+      type: 'subscribe_run',
+      request_id: 'req_subscribe_01',
+      run_id: manifest.runId,
+      payload: {
+        events: ['store_updated', 'server_stopping'],
+        initial_snapshot: 'projection',
+      },
+    });
+
+    const subscribed = await subscription.nextMessage();
+    const projectionSnapshot = await subscription.nextMessage();
+
+    const appendResponse = await sendOneShot(socketPath, {
+      protocol_version: 1,
+      type: 'append_ingress',
+      request_id: 'req_append_stream_01',
+      run_id: manifest.runId,
+      payload: {
+        envelopes: ingress,
+      },
+    });
+    const storeUpdated = await subscription.nextMessage();
+
+    expect(subscribed.type).toBe('subscribed');
+    expect((subscribed.payload as { current_store_revision: number }).current_store_revision).toBe(0);
+    expect(projectionSnapshot.type).toBe('projection_snapshot');
+    expect((projectionSnapshot.payload as { store_revision: number }).store_revision).toBe(0);
+    expect(appendResponse.type).toBe('append_ingress_ok');
+    expect(storeUpdated.type).toBe('store_updated');
+    expect((storeUpdated.payload as { store_revision: number }).store_revision).toBe(1);
+
+    subscription.socket.end();
+  });
+
+  it('disconnects slow subscribers with a terminal stream_error', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agent-kumite-live-socket-'));
+    const socketPath = join(dir, 'live.sock');
+    server = new LiveIngestionSocketServer({
+      socketPath,
+      subscriberQueueCapacity: 0,
+      initialStores: [
+        createAcpLiveRunStore({ manifest, roster }),
+      ],
+    });
+    await server.start();
+
+    const slowSubscriber = await openSubscription(socketPath, {
+      protocol_version: 1,
+      type: 'subscribe_run',
+      request_id: 'req_subscribe_slow',
+      run_id: manifest.runId,
+      payload: {
+        events: ['store_updated'],
+        initial_snapshot: 'none',
+      },
+    });
+
+    const streamErrorPromise = slowSubscriber.nextMessage();
+    await sendOneShot(socketPath, {
+      protocol_version: 1,
+      type: 'append_ingress',
+      request_id: 'req_append_slow_01',
+      run_id: manifest.runId,
+      payload: {
+        envelopes: ingress.slice(0, 1),
+      },
+    });
+    const streamError = await streamErrorPromise;
+
+    expect(streamError.type).toBe('stream_error');
+    expect((streamError.payload as { code: string }).code).toBe('slow_subscriber');
+  });
+
+  it('emits server_stopping to active subscribers during shutdown', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agent-kumite-live-socket-'));
+    const socketPath = join(dir, 'live.sock');
+    server = new LiveIngestionSocketServer({
+      socketPath,
+      initialStores: [
+        createAcpLiveRunStore({ manifest, roster }),
+      ],
+    });
+    await server.start();
+
+    const stoppingSubscriber = await openSubscription(socketPath, {
+      protocol_version: 1,
+      type: 'subscribe_run',
+      request_id: 'req_subscribe_stop',
+      run_id: manifest.runId,
+      payload: {
+        events: ['store_updated'],
+        initial_snapshot: 'none',
+      },
+    });
+
+    const subscribed = await stoppingSubscriber.nextMessage();
+    expect(subscribed.type).toBe('subscribed');
+
+    const stoppingEventPromise = stoppingSubscriber.nextMessage();
+    await server.stop();
+    server = null;
+    const stoppingEvent = await stoppingEventPromise;
+
+    expect(stoppingEvent.type).toBe('server_stopping');
+    expect((stoppingEvent.payload as { code: string }).code).toBe('server_stopping');
   });
 });
