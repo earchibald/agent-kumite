@@ -1,0 +1,8 @@
+[
+  { "agentId": "agent-alpha", "displayName": "Alpha", "seat": 1, "role": "contender", "modelFamily": "gpt-5", "modelVersion": "5.4", "memoryEnabled": true },
+  { "agentId": "agent-bravo", "displayName": "Bravo", "seat": 2, "role": "contender", "modelFamily": "claude-sonnet", "modelVersion": "4.6", "memoryEnabled": true },
+  { "agentId": "agent-charlie", "displayName": "Charlie", "seat": 3, "role": "contender", "modelFamily": "gpt-5-mini", "modelVersion": "5.0", "memoryEnabled": true },
+  { "agentId": "agent-delta", "displayName": "Delta", "seat": 4, "role": "contender", "modelFamily": "claude-haiku", "modelVersion": "4.5", "memoryEnabled": true },
+  { "agentId": "agent-analyst", "displayName": "Analyst", "seat": 5, "role": "analyst", "modelFamily": "gpt-4.1", "modelVersion": "4.1", "memoryEnabled": true },
+  { "agentId": "agent-saboteur", "displayName": "Saboteur", "seat": 6, "role": "saboteur", "modelFamily": "claude-opus", "modelVersion": "4.7", "memoryEnabled": true }
+]

@@ -1,0 +1,11 @@
+{
+  "runId": "run_demo_c5_seed_0001",
+  "matchId": "match_demo_seed_0001",
+  "condition": "C5",
+  "runSeed": 1,
+  "rosterMode": "mixed-model",
+  "memoryMode": "on",
+  "operatorAffordanceSet": "intervention-enabled",
+  "codeRevision": "885995e",
+  "validityStatus": "valid"
+}

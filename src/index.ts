@@ -7,6 +7,7 @@ export * from './report.js';
 export * from './report-cli-lib.js';
 export * from './projection.js';
 export * from './projection-cli-lib.js';
+export * from './live-projection-cli-lib.js';
 export * from './replay.js';
 export * from './replay-cli-lib.js';
 export * from './bundle-cli-lib.js';
