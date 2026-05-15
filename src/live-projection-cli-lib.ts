@@ -5,13 +5,16 @@ import {
   appendAcpIngressEnvelopesToRunStore,
   createAcpLiveRunStore,
   currentAcpLiveControlRoomProjection,
+  type AcpLiveRunStore,
 } from './acp-live-run-store.js';
 import { readAcpLiveFileInputs } from './acp-live-file-input.js';
+import { readAcpLiveRunStoreFromFile } from './acp-live-run-store-file.js';
 
 export interface LiveProjectionCliOptions {
-  manifestPath: string;
-  rosterPath: string;
-  ingressPath: string;
+  manifestPath?: string;
+  rosterPath?: string;
+  ingressPath?: string;
+  storeInputPath?: string;
   outputPath: string;
   pretty: boolean;
 }
@@ -24,6 +27,7 @@ export function parseLiveProjectionCliArgs(args: readonly string[]): LiveProject
   let manifestPath: string | undefined;
   let rosterPath: string | undefined;
   let ingressPath: string | undefined;
+  let storeInputPath: string | undefined;
   let outputPath: string | undefined;
   let pretty = false;
 
@@ -51,6 +55,12 @@ export function parseLiveProjectionCliArgs(args: readonly string[]): LiveProject
       continue;
     }
 
+    if (arg === '--store-input') {
+      storeInputPath = args[index + 1];
+      index += 1;
+      continue;
+    }
+
     if (arg === '--output') {
       outputPath = args[index + 1];
       index += 1;
@@ -65,16 +75,12 @@ export function parseLiveProjectionCliArgs(args: readonly string[]): LiveProject
     throw new Error(`unknown argument: ${arg}`);
   }
 
-  if (!manifestPath) {
-    throw new Error('missing required --manifest <run-manifest.json>');
+  if (storeInputPath && (manifestPath || rosterPath || ingressPath)) {
+    throw new Error('use either --store-input <live-run-store.json> or --manifest/--roster/--ingress, not both');
   }
 
-  if (!rosterPath) {
-    throw new Error('missing required --roster <roster.json>');
-  }
-
-  if (!ingressPath) {
-    throw new Error('missing required --ingress <acp-ingress.json>');
+  if (!storeInputPath && (!manifestPath || !rosterPath || !ingressPath)) {
+    throw new Error('missing required live input: either --store-input <live-run-store.json> or --manifest <run-manifest.json> --roster <roster.json> --ingress <acp-ingress.json>');
   }
 
   if (!outputPath) {
@@ -82,9 +88,10 @@ export function parseLiveProjectionCliArgs(args: readonly string[]): LiveProject
   }
 
   return {
-    manifestPath: resolve(manifestPath),
-    rosterPath: resolve(rosterPath),
-    ingressPath: resolve(ingressPath),
+    ...(manifestPath ? { manifestPath: resolve(manifestPath) } : {}),
+    ...(rosterPath ? { rosterPath: resolve(rosterPath) } : {}),
+    ...(ingressPath ? { ingressPath: resolve(ingressPath) } : {}),
+    ...(storeInputPath ? { storeInputPath: resolve(storeInputPath) } : {}),
     outputPath: resolve(outputPath),
     pretty,
   };
@@ -93,19 +100,23 @@ export function parseLiveProjectionCliArgs(args: readonly string[]): LiveProject
 export async function writeLiveControlRoomProjectionFromFiles(
   options: LiveProjectionCliOptions,
 ): Promise<LiveProjectionCliResult> {
-  const inputs = await readAcpLiveFileInputs({
-    manifestPath: options.manifestPath,
-    rosterPath: options.rosterPath,
-    ingressPath: options.ingressPath,
-  });
-
-  const store = appendAcpIngressEnvelopesToRunStore(
-    createAcpLiveRunStore({
-      manifest: inputs.manifest,
-      roster: inputs.roster,
-    }),
-    inputs.ingress,
-  );
+  let store: AcpLiveRunStore;
+  if (options.storeInputPath) {
+    store = await readAcpLiveRunStoreFromFile(options.storeInputPath);
+  } else {
+    const inputs = await readAcpLiveFileInputs({
+      manifestPath: options.manifestPath!,
+      rosterPath: options.rosterPath!,
+      ingressPath: options.ingressPath!,
+    });
+    store = appendAcpIngressEnvelopesToRunStore(
+      createAcpLiveRunStore({
+        manifest: inputs.manifest,
+        roster: inputs.roster,
+      }),
+      inputs.ingress,
+    );
+  }
   const projection = currentAcpLiveControlRoomProjection(store);
 
   await mkdir(dirname(options.outputPath), { recursive: true });
@@ -114,5 +125,5 @@ export async function writeLiveControlRoomProjectionFromFiles(
 }
 
 export function liveProjectionUsageText(): string {
-  return 'Usage: agent-kumite-live-project --manifest <run-manifest.json> --roster <roster.json> --ingress <acp-ingress.json> --output <live-control-room.json> [--pretty]';
+  return 'Usage: agent-kumite-live-project (--store-input <live-run-store.json> | --manifest <run-manifest.json> --roster <roster.json> --ingress <acp-ingress.json>) --output <live-control-room.json> [--pretty]';
 }

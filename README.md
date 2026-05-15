@@ -73,7 +73,7 @@ That adds:
 | `npm run project` | Project one artifact bundle into layered control-room / grimoire JSON | `control-room.json` |
 | `npm run live-store` | Read live ACP ingress into the canonical live run-store JSON shape | `live-run-store.json` |
 | `npm run live-append` | Append new ACP ingress onto an existing persisted live run-store JSON file | `live-run-store.updated.json` |
-| `npm run live-project` | Read live ACP ingress into the run store and write live control-room JSON | `live-control-room.json` |
+| `npm run live-project` | Write live control-room JSON from either raw live inputs or a persisted live-store file | `live-control-room.json` |
 | `npm run replay` | Derive replay-lab marker-jump and snapshot-diff helpers from projected control-room JSON | `replay-lab.json` |
 
 The underlying CLI contracts are:
@@ -87,7 +87,7 @@ agent-kumite-matrix --input <artifact-or-summary.json> [--input ...] --output <m
 agent-kumite-project --input <artifact-bundle.json> --output <control-room.json> [--pretty]
 agent-kumite-live-store --manifest <run-manifest.json> --roster <roster.json> --ingress <acp-ingress.json> --output <live-run-store.json> [--pretty]
 agent-kumite-live-append --store-input <live-run-store.json> --ingress <acp-ingress.json> --output <live-run-store.json> [--pretty]
-agent-kumite-live-project --manifest <run-manifest.json> --roster <roster.json> --ingress <acp-ingress.json> --output <live-control-room.json> [--pretty]
+agent-kumite-live-project (--store-input <live-run-store.json> | --manifest <run-manifest.json> --roster <roster.json> --ingress <acp-ingress.json>) --output <live-control-room.json> [--pretty]
 agent-kumite-replay --input <control-room.json> --output <replay-lab.json> [--marker <marker-id>] [--from <round:phase>] [--to <round:phase>] [--pretty]
 ```
 
@@ -175,6 +175,15 @@ Use this when you want the live-path adapter surface:
 - canonical ACP ingress reduced through the live run store
 - live home / callsheet / layered snapshot / replay JSON
 - no fabricated benchmark summary or aftermath fields
+
+If you already have a persisted live store, you can project from that directly:
+
+```bash
+npm run live-project -- \
+  --store-input out/live/run-store.live.json \
+  --output out/live/control-room.from-store.json \
+  --pretty
+```
 
 If you already have a persisted live store and want to append more ingress instead of rebuilding it:
 

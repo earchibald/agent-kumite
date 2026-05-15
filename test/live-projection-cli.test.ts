@@ -10,6 +10,7 @@ import {
   createAcpLiveRunStore,
   currentAcpLiveControlRoomProjection,
   parseLiveProjectionCliArgs,
+  writeAcpLiveRunStoreToFile,
   writeLiveControlRoomProjectionFromFiles,
   type AcpIngressEnvelope,
   type RosterEntry,
@@ -53,6 +54,34 @@ describe('live control-room projection adapter', () => {
     expect(written).toEqual(expected);
     expect(written.home.runId).toBe('run_demo_c5_seed_0001');
     expect(written.live.matchStatus).toBe('live');
+    expect(written.live.interventionCount).toBe(2);
+    expect(written.replay.snapshots).toHaveLength(4);
+  });
+
+  it('writes the same live projection JSON from a persisted live-store file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agent-kumite-live-project-store-'));
+    const storePath = join(dir, 'live-run-store.json');
+    const outputPath = join(dir, 'live-control-room.json');
+
+    const store = appendAcpIngressEnvelopesToRunStore(
+      createAcpLiveRunStore({ manifest, roster }),
+      ingress,
+    );
+    await writeAcpLiveRunStoreToFile(storePath, store, true);
+
+    const parsed = parseLiveProjectionCliArgs([
+      '--store-input',
+      storePath,
+      '--output',
+      outputPath,
+      '--pretty',
+    ]);
+    const result = await writeLiveControlRoomProjectionFromFiles(parsed);
+    const written = JSON.parse(await readFile(result.outputPath, 'utf8'));
+    const expected = currentAcpLiveControlRoomProjection(store);
+
+    expect(written).toEqual(expected);
+    expect(written.home.runId).toBe('run_demo_c5_seed_0001');
     expect(written.live.interventionCount).toBe(2);
     expect(written.replay.snapshots).toHaveLength(4);
   });
