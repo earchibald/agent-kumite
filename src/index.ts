@@ -16,6 +16,7 @@ export * from './live-run-store-cli-lib.js';
 export * from './live-store-append-cli-lib.js';
 export * from './live-ingestion-socket.js';
 export * from './live-ingestion-socket-cli-lib.js';
+export * from './live-ingestion-socket-bridge-cli-lib.js';
 export * from './live-ingestion-socket-client.js';
 export * from './live-ingestion-socket-follow-cli-lib.js';
 export * from './live-ingestion-socket-inspect-cli-lib.js';

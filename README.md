@@ -12,6 +12,7 @@ This repo lets you:
 - append new ACP ingress onto an existing persisted live run-store JSON file
 - project ACP ingress into live control-room JSON through the run-store path
 - serve persisted live stores over a local live-ingestion UDS daemon
+- bridge ACP-style incremental ingress into that live socket from stdin or file
 - query and inspect the live-ingestion daemon through reusable client helpers and a CLI
 - mirror daemon-backed live store/projection snapshots to local files with a follow CLI
 - generate replay-lab helper outputs such as marker jumps and snapshot diffs
@@ -78,6 +79,7 @@ That adds:
 | `npm run live-append` | Append new ACP ingress onto an existing persisted live run-store JSON file | `live-run-store.updated.json` |
 | `npm run live-project` | Write live control-room JSON from either raw live inputs or a persisted live-store file | `live-control-room.json` |
 | `npm run live-socket` | Serve one or more persisted live-store files over the local live-ingestion socket protocol | `live.sock` |
+| `npm run live-bridge` | Feed ACP ingress incrementally into the live socket from NDJSON or JSON-array input | stdout summary JSON |
 | `npm run live-inspect` | Inspect or drive the live-ingestion daemon with one-shot requests or a bounded subscription stream | stdout JSON / NDJSON |
 | `npm run live-follow` | Follow one run over the socket and keep local store/projection snapshot files mirrored | mirrored JSON files |
 | `npm run replay` | Derive replay-lab marker-jump and snapshot-diff helpers from projected control-room JSON | `replay-lab.json` |
@@ -95,6 +97,7 @@ agent-kumite-live-store --manifest <run-manifest.json> --roster <roster.json> --
 agent-kumite-live-append --store-input <live-run-store.json> --ingress <acp-ingress.json> --output <live-run-store.json> [--pretty]
 agent-kumite-live-project (--store-input <live-run-store.json> | --manifest <run-manifest.json> --roster <roster.json> --ingress <acp-ingress.json>) --output <live-control-room.json> [--pretty]
 agent-kumite-live-socket --socket <live-ingestion.sock> --store-input <live-run-store.json> [--store-input <live-run-store.json> ...] [--subscriber-queue-capacity <count>]
+agent-kumite-live-bridge --socket <live-ingestion.sock> --run-id <run-id> [--input <acp-ingress.ndjson|json>] [--input-format <ndjson|json-array>] [--batch-size <count>] [--request-id-prefix <prefix>]
 agent-kumite-live-inspect <get-store|get-projection|append-ingress|subscribe> --socket <live-ingestion.sock> --run-id <run-id> [--request-id <id>] [--pretty] [--ingress <acp-ingress.json>] [--event <store_updated|server_stopping>] [--initial-snapshot <none|store|projection>] [--limit <count>]
 agent-kumite-live-follow --socket <live-ingestion.sock> --run-id <run-id> (--store-output <live-run-store.json> | --projection-output <live-control-room.json> | both) [--pretty] [--reconnect-delay-ms <ms>] [--max-reconnects <count>] [--snapshot-limit <count>]
 agent-kumite-replay --input <control-room.json> --output <replay-lab.json> [--marker <marker-id>] [--from <round:phase>] [--to <round:phase>] [--pretty]
@@ -244,6 +247,24 @@ Use this when you want:
 - a reusable client boundary instead of ad hoc `net.Socket` code
 - one-shot store/projection reads or ingress appends against the daemon
 - a quick smoke/inspection path for subscription bootstrap and updates
+
+If you want to feed incremental ACP ingress into the daemon from a runtime-friendly source:
+
+```bash
+npm run live-bridge -- \
+  --socket out/live/live.sock \
+  --run-id run_demo_c5_seed_0001 \
+  --input fixtures/acp-ingress.sequence.c5.json \
+  --input-format json-array \
+  --batch-size 1 \
+  --request-id-prefix demo_bridge
+```
+
+Use this when you want:
+
+- a thin append bridge on top of the existing socket client contract
+- explicit run mapping and stable request ids for incremental ingress
+- a simple path from future ACP runtime events into the daemon/follow toolchain
 
 If you want to keep local mirror files in sync with the daemon:
 
