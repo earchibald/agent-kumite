@@ -11,6 +11,7 @@ This repo lets you:
 - persist canonical ACP live run-store JSON from manifest + roster + ingress
 - append new ACP ingress onto an existing persisted live run-store JSON file
 - project ACP ingress into live control-room JSON through the run-store path
+- serve persisted live stores over a local live-ingestion UDS daemon
 - generate replay-lab helper outputs such as marker jumps and snapshot diffs
 
 The current implementation is local and fixture-driven. It is the artifact / benchmark / operator-view pipeline underneath the future ACP-backed live surfaces.
@@ -74,6 +75,7 @@ That adds:
 | `npm run live-store` | Read live ACP ingress into the canonical live run-store JSON shape | `live-run-store.json` |
 | `npm run live-append` | Append new ACP ingress onto an existing persisted live run-store JSON file | `live-run-store.updated.json` |
 | `npm run live-project` | Write live control-room JSON from either raw live inputs or a persisted live-store file | `live-control-room.json` |
+| `npm run live-socket` | Serve one or more persisted live-store files over the local live-ingestion socket protocol | `live.sock` |
 | `npm run replay` | Derive replay-lab marker-jump and snapshot-diff helpers from projected control-room JSON | `replay-lab.json` |
 
 The underlying CLI contracts are:
@@ -88,6 +90,7 @@ agent-kumite-project --input <artifact-bundle.json> --output <control-room.json>
 agent-kumite-live-store --manifest <run-manifest.json> --roster <roster.json> --ingress <acp-ingress.json> --output <live-run-store.json> [--pretty]
 agent-kumite-live-append --store-input <live-run-store.json> --ingress <acp-ingress.json> --output <live-run-store.json> [--pretty]
 agent-kumite-live-project (--store-input <live-run-store.json> | --manifest <run-manifest.json> --roster <roster.json> --ingress <acp-ingress.json>) --output <live-control-room.json> [--pretty]
+agent-kumite-live-socket --socket <live-ingestion.sock> --store-input <live-run-store.json> [--store-input <live-run-store.json> ...] [--subscriber-queue-capacity <count>]
 agent-kumite-replay --input <control-room.json> --output <replay-lab.json> [--marker <marker-id>] [--from <round:phase>] [--to <round:phase>] [--pretty]
 ```
 
@@ -194,6 +197,20 @@ npm run live-append -- \
   --output out/live/run-store.updated.json \
   --pretty
 ```
+
+If you want to serve a persisted live store over the local UDS transport:
+
+```bash
+npm run live-socket -- \
+  --socket out/live/live.sock \
+  --store-input out/live/run-store.live.json
+```
+
+Use this when you want the first real incremental transport boundary:
+
+- a local newline-delimited JSON socket for one-shot requests and subscriptions
+- canonical state loaded from persisted live-store JSON files instead of ad hoc in-memory fixtures
+- graceful shutdown on `SIGINT` / `SIGTERM`
 
 ### 6. Run a small benchmark batch locally
 
