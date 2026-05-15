@@ -9,6 +9,11 @@ import { ROUND_PHASE_ORDER } from './schema.js';
 
 const PHASE_INDEX = new Map<RoundPhase, number>(ROUND_PHASE_ORDER.map((phase, index) => [phase, index]));
 
+export type ReplayProjectionInput = Pick<
+  ControlRoomProjection,
+  'manifest' | 'home' | 'callsheet' | 'layeredSnapshots' | 'replay'
+>;
+
 export interface ReplayMarkerJump {
   marker: ControlRoomReplayMarker;
   resolvedCursor: PhaseCursor;
@@ -80,7 +85,7 @@ function diffIds(left: readonly string[], right: readonly string[]): ReplayLayer
 }
 
 function nearestLayeredSnapshot(
-  projection: ControlRoomProjection,
+  projection: ReplayProjectionInput,
   cursor: PhaseCursor,
 ): LayeredCursorSnapshot {
   const sorted = [...projection.layeredSnapshots].sort((left, right) => compareCursor(left.cursor, right.cursor));
@@ -93,7 +98,7 @@ function nearestLayeredSnapshot(
 }
 
 function nearestReplaySnapshot(
-  projection: ControlRoomProjection,
+  projection: ReplayProjectionInput,
   cursor: PhaseCursor,
 ): ControlRoomReplaySnapshot | null {
   return [...projection.replay.snapshots]
@@ -102,7 +107,7 @@ function nearestReplaySnapshot(
     .at(-1) ?? null;
 }
 
-function timelineEndpoints(projection: ControlRoomProjection): { first: PhaseCursor; last: PhaseCursor } {
+function timelineEndpoints(projection: ReplayProjectionInput): { first: PhaseCursor; last: PhaseCursor } {
   const first = projection.replay.timeline[0];
   const last = projection.replay.timeline.at(-1);
   if (!first || !last) {
@@ -131,7 +136,7 @@ function buildScoreChanges(
 }
 
 export function findReplayMarkerJump(
-  projection: ControlRoomProjection,
+  projection: ReplayProjectionInput,
   markerId: string,
 ): ReplayMarkerJump {
   const marker = projection.replay.markers.find((candidate) => candidate.markerId === markerId);
@@ -149,7 +154,7 @@ export function findReplayMarkerJump(
 }
 
 export function createReplaySnapshotDiff(
-  projection: ControlRoomProjection,
+  projection: ReplayProjectionInput,
   fromCursor?: PhaseCursor,
   toCursor?: PhaseCursor,
 ): ReplaySnapshotDiff {
@@ -220,7 +225,7 @@ export function parseReplayCursor(value: string): PhaseCursor {
   };
 }
 
-export function normalizeControlRoomProjectionInput(value: unknown): ControlRoomProjection {
+export function normalizeControlRoomProjectionInput(value: unknown): ReplayProjectionInput {
   if (
     value
     && typeof value === 'object'
@@ -229,9 +234,8 @@ export function normalizeControlRoomProjectionInput(value: unknown): ControlRoom
     && 'callsheet' in value
     && 'layeredSnapshots' in value
     && 'replay' in value
-    && 'aftermath' in value
   ) {
-    return value as ControlRoomProjection;
+    return value as ReplayProjectionInput;
   }
 
   throw new Error('input must be a control-room projection JSON');

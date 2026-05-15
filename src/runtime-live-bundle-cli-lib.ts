@@ -6,6 +6,7 @@ import { createAcpLiveRunStore } from './acp-live-run-store.js';
 import { writeAcpLiveRunStoreToFile } from './acp-live-run-store-file.js';
 import { startLiveIngestionSocketDaemon } from './live-ingestion-socket-cli-lib.js';
 import { followLiveIngestionSocketSnapshots } from './live-ingestion-socket-follow-cli-lib.js';
+import { writeReplayLabHelpersFromFile } from './replay-cli-lib.js';
 import { exportRuntimeAcpIngress } from './runtime-acp-ingress-cli-lib.js';
 import { streamDeterministicRuntimeToLiveSocket } from './runtime-live-stream-cli-lib.js';
 import type { DeterministicRunnerInput } from './runner.js';
@@ -14,6 +15,10 @@ export interface RuntimeLiveBundleCliOptions {
   inputPath: string;
   storeOutputPath: string;
   projectionOutputPath: string;
+  replayOutputPath?: string;
+  markerId?: string;
+  fromCursor?: string;
+  toCursor?: string;
   socketPath?: string;
   batchSize: number;
   requestIdPrefix: string;
@@ -23,6 +28,7 @@ export interface RuntimeLiveBundleCliOptions {
 export interface RuntimeLiveBundleCliResult {
   storeOutputPath: string;
   projectionOutputPath: string;
+  replayOutputPath?: string;
   socketPath: string;
   appendedEnvelopeCount: number;
   batchesSent: number;
@@ -32,6 +38,10 @@ export function parseRuntimeLiveBundleCliArgs(args: readonly string[]): RuntimeL
   let inputPath: string | undefined;
   let storeOutputPath: string | undefined;
   let projectionOutputPath: string | undefined;
+  let replayOutputPath: string | undefined;
+  let markerId: string | undefined;
+  let fromCursor: string | undefined;
+  let toCursor: string | undefined;
   let socketPath: string | undefined;
   let batchSize = 1;
   let requestIdPrefix = 'runtime_bundle';
@@ -67,6 +77,30 @@ export function parseRuntimeLiveBundleCliArgs(args: readonly string[]): RuntimeL
       continue;
     }
 
+    if (arg === '--replay-output') {
+      replayOutputPath = args[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--marker') {
+      markerId = args[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--from') {
+      fromCursor = args[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--to') {
+      toCursor = args[index + 1];
+      index += 1;
+      continue;
+    }
+
     if (arg === '--batch-size') {
       batchSize = parsePositiveInteger(args[index + 1], '--batch-size');
       index += 1;
@@ -96,11 +130,18 @@ export function parseRuntimeLiveBundleCliArgs(args: readonly string[]): RuntimeL
   if (!projectionOutputPath) {
     throw new Error('missing required --projection-output <live-control-room.json>');
   }
+  if (!replayOutputPath && (markerId || fromCursor || toCursor)) {
+    throw new Error('--marker, --from, and --to require --replay-output <replay-lab.json>');
+  }
 
   return {
     inputPath: resolve(inputPath),
     storeOutputPath: resolve(storeOutputPath),
     projectionOutputPath: resolve(projectionOutputPath),
+    ...(replayOutputPath ? { replayOutputPath: resolve(replayOutputPath) } : {}),
+    ...(markerId ? { markerId } : {}),
+    ...(fromCursor ? { fromCursor } : {}),
+    ...(toCursor ? { toCursor } : {}),
     ...(socketPath ? { socketPath: resolve(socketPath) } : {}),
     batchSize,
     requestIdPrefix,
@@ -154,10 +195,21 @@ export async function runBundledRuntimeLiveFlow(
       requestIdPrefix: options.requestIdPrefix,
     });
     await followPromise;
+    if (options.replayOutputPath) {
+      await writeReplayLabHelpersFromFile({
+        inputPath: options.projectionOutputPath,
+        outputPath: options.replayOutputPath,
+        ...(options.markerId ? { markerId: options.markerId } : {}),
+        ...(options.fromCursor ? { fromCursor: options.fromCursor } : {}),
+        ...(options.toCursor ? { toCursor: options.toCursor } : {}),
+        pretty: options.pretty,
+      });
+    }
 
     return {
       storeOutputPath: options.storeOutputPath,
       projectionOutputPath: options.projectionOutputPath,
+      ...(options.replayOutputPath ? { replayOutputPath: options.replayOutputPath } : {}),
       socketPath,
       appendedEnvelopeCount: streamResult.appendedEnvelopeCount,
       batchesSent: streamResult.batchesSent,
@@ -176,6 +228,10 @@ export async function runBundledRuntimeLiveFlowFromFile(
   const bundledOptions: Omit<RuntimeLiveBundleCliOptions, 'inputPath'> = {
     storeOutputPath: options.storeOutputPath,
     projectionOutputPath: options.projectionOutputPath,
+    ...(options.replayOutputPath ? { replayOutputPath: options.replayOutputPath } : {}),
+    ...(options.markerId ? { markerId: options.markerId } : {}),
+    ...(options.fromCursor ? { fromCursor: options.fromCursor } : {}),
+    ...(options.toCursor ? { toCursor: options.toCursor } : {}),
     batchSize: options.batchSize,
     requestIdPrefix: options.requestIdPrefix,
     pretty: options.pretty,
@@ -185,5 +241,5 @@ export async function runBundledRuntimeLiveFlowFromFile(
 }
 
 export function runtimeLiveBundleUsageText(): string {
-  return 'Usage: agent-kumite-live-bundle --input <match.json> --store-output <live-run-store.json> --projection-output <live-control-room.json> [--socket <live-ingestion.sock>] [--batch-size <count>] [--request-id-prefix <prefix>] [--pretty]';
+  return 'Usage: agent-kumite-live-bundle --input <match.json> --store-output <live-run-store.json> --projection-output <live-control-room.json> [--replay-output <replay-lab.json> --marker <marker-id> --from <round:phase> --to <round:phase>] [--socket <live-ingestion.sock>] [--batch-size <count>] [--request-id-prefix <prefix>] [--pretty]';
 }
