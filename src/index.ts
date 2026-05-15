@@ -15,3 +15,4 @@ export * from './matrix.js';
 export * from './matrix-cli-lib.js';
 export * from './acp-ingress.js';
 export * from './acp-ingress-reducer.js';
+export * from './acp-live-run-store.js';

@@ -25,6 +25,12 @@ export interface AcpIngressReducerInput {
   envelopes: readonly AcpIngressEnvelope[];
 }
 
+export interface AcpIngressReducerSeedInput {
+  manifest: RunManifest;
+  roster: readonly RosterEntry[];
+  initialTimestamp?: string;
+}
+
 export interface AcpIngressReducerState {
   matchState: MatchState;
   awaitRecords: AwaitRecord[];
@@ -37,6 +43,14 @@ export interface AcpIngressReducerState {
 
 function defaultInitialTimestamp(envelopes: readonly AcpIngressEnvelope[]): string {
   return envelopes[0]?.timestamp ?? '2026-05-15T00:00:00Z';
+}
+
+function hasAppliedIngress(state: AcpIngressReducerState): boolean {
+  return state.publicEvents.length > 0
+    || state.awaitRecords.length > 0
+    || state.interventions.length > 0
+    || state.markers.length > 0
+    || state.snapshots.length > 1;
 }
 
 function seedStateToIngressStart(
@@ -193,22 +207,47 @@ function applyEnvelopeToState(
   };
 }
 
-export function reduceAcpIngressEnvelopes(
-  input: AcpIngressReducerInput,
+function seedReducerStateToFirstEnvelope(
+  state: AcpIngressReducerState,
+  envelope: AcpIngressEnvelope,
 ): AcpIngressReducerState {
-  const initialMatchState = seedStateToIngressStart(
-    createInitialMatchState(input.manifest, input.roster),
-    input.envelopes,
+  if (hasAppliedIngress(state)) {
+    return state;
+  }
+
+  const seededMatchState = seedStateToIngressStart(state.matchState, [envelope]);
+  const seededSnapshot = snapshotFromMatchState(
+    'snapshot_ingress_start',
+    envelope.timestamp,
+    seededMatchState,
   );
+
+  return {
+    ...state,
+    matchState: seededMatchState,
+    snapshots: [seededSnapshot],
+    replayBundle: createReplayBundle({
+      runId: seededMatchState.runId,
+      publicEvents: [],
+      snapshots: [seededSnapshot],
+      markers: [],
+    }),
+  };
+}
+
+export function createAcpIngressReducerState(
+  input: AcpIngressReducerSeedInput,
+): AcpIngressReducerState {
+  const initialMatchState = createInitialMatchState(input.manifest, input.roster);
   const initialSnapshots = [
     snapshotFromMatchState(
       'snapshot_ingress_start',
-      defaultInitialTimestamp(input.envelopes),
+      input.initialTimestamp ?? defaultInitialTimestamp([]),
       initialMatchState,
     ),
   ];
 
-  const initialState: AcpIngressReducerState = {
+  return {
     matchState: initialMatchState,
     awaitRecords: [],
     publicEvents: [],
@@ -222,9 +261,34 @@ export function reduceAcpIngressEnvelopes(
       markers: [],
     }),
   };
+}
 
-  return input.envelopes.reduce(
-    (state, envelope) => applyEnvelopeToState(state, envelope),
-    initialState,
+export function appendAcpIngressEnvelope(
+  state: AcpIngressReducerState,
+  envelope: AcpIngressEnvelope,
+): AcpIngressReducerState {
+  return applyEnvelopeToState(seedReducerStateToFirstEnvelope(state, envelope), envelope);
+}
+
+export function appendAcpIngressEnvelopes(
+  state: AcpIngressReducerState,
+  envelopes: readonly AcpIngressEnvelope[],
+): AcpIngressReducerState {
+  return envelopes.reduce(
+    (nextState, envelope) => appendAcpIngressEnvelope(nextState, envelope),
+    state,
+  );
+}
+
+export function reduceAcpIngressEnvelopes(
+  input: AcpIngressReducerInput,
+): AcpIngressReducerState {
+  return appendAcpIngressEnvelopes(
+    createAcpIngressReducerState({
+      manifest: input.manifest,
+      roster: input.roster,
+      initialTimestamp: defaultInitialTimestamp(input.envelopes),
+    }),
+    input.envelopes,
   );
 }
