@@ -83,7 +83,7 @@ That adds:
 | `npm run live-project` | Write live control-room JSON from either raw live inputs or a persisted live-store file | `live-control-room.json` |
 | `npm run live-socket` | Serve one or more persisted live-store files over the local live-ingestion socket protocol | `live.sock` |
 | `npm run live-bridge` | Feed ACP ingress incrementally into the live socket from NDJSON or JSON-array input | stdout summary JSON |
-| `npm run live-export-acp` | Export one deterministic harness run as ACP ingress JSON-array or NDJSON | `acp-ingress.json` / `acp-ingress.ndjson` |
+| `npm run live-export-acp` | Export one deterministic harness run as ACP ingress JSON-array or NDJSON, including commitment and public-event deltas needed by the live path | `acp-ingress.json` / `acp-ingress.ndjson` |
 | `npm run live-stream-runtime` | Run one deterministic harness input and stream its ACP ingress directly into the daemon | stdout summary JSON |
 | `npm run live-bundle` | Run the one-command local live workflow: seed daemon, mirror outputs, stream the deterministic run, and optionally emit replay helpers | mirrored JSON files + summary JSON |
 | `npm run live-inspect` | Inspect or drive the live-ingestion daemon with one-shot requests or a bounded subscription stream | stdout JSON / NDJSON |
@@ -289,6 +289,7 @@ Use this when you want:
 
 - a deterministic harness -> ACP ingress export step before the live bridge
 - explicit ordered ACP envelopes derived from one known run input
+- richer live-state deltas such as commitment submissions, public utterances, reveals, eliminations, and score deltas
 - parity testing across runtime export -> bridge -> follow/project vs direct live reduction
 
 If you want to skip the intermediate ACP export file and stream straight into the daemon:

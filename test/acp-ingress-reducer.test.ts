@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
+  exportRuntimeAcpIngress,
   reduceAcpIngressEnvelopes,
   type AcpIngressEnvelope,
   type DeterministicRunnerInput,
@@ -65,5 +66,33 @@ describe('ACP ingress reducer', () => {
       { round: 3, phase: 'public_square' },
       { round: 3, phase: 'task_submission' },
     ]);
+  });
+
+  it('absorbs exported runtime deltas into canonical live state', () => {
+    const exported = exportRuntimeAcpIngress(runnerFixture);
+    const reduced = reduceAcpIngressEnvelopes({
+      manifest: runnerFixture.manifest,
+      roster: runnerFixture.roster,
+      envelopes: exported,
+    });
+
+    expect(reduced.matchState.structuredCommitments).toHaveLength(2);
+    expect(reduced.matchState.structuredCommitments.every((envelope) => envelope.status === 'revealed')).toBe(true);
+    expect(reduced.matchState.eliminatedAgentIds).toContain('agent-saboteur');
+    expect(reduced.matchState.aliveAgentIds).not.toContain('agent-saboteur');
+    expect(reduced.matchState.scoreByAgent['agent-alpha']).toBeGreaterThan(0);
+    expect(reduced.publicEvents.map((event) => event.kind)).toEqual(
+      expect.arrayContaining([
+        'round_open',
+        'public_utterance',
+        'vote_reveal',
+        'commitment_reveal',
+        'elimination',
+        'score_delta',
+      ]),
+    );
+    expect(reduced.markers.map((marker) => marker.markerType)).toEqual(
+      expect.arrayContaining(['reveal', 'elimination', 'bookmark']),
+    );
   });
 });

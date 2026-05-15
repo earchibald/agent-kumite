@@ -3,10 +3,12 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
+  exportRuntimeAcpIngress,
   normalizeAcpIngressEnvelope,
   normalizeAcpIngressEnvelopes,
   validateAcpIngressEnvelope,
   type AcpIngressEnvelope,
+  type DeterministicRunnerInput,
 } from '../src/index.ts';
 
 function readFixture<T>(name: string): T {
@@ -16,6 +18,7 @@ function readFixture<T>(name: string): T {
 
 describe('ACP ingress normalization', () => {
   const fixture = readFixture<AcpIngressEnvelope[]>('acp-ingress.sequence.c5.json');
+  const runtimeFixture = readFixture<DeterministicRunnerInput>('demo-match.input.json');
 
   it('validates the ACP ingress fixture envelopes', () => {
     for (const envelope of fixture) {
@@ -76,6 +79,37 @@ describe('ACP ingress normalization', () => {
     expect(normalized[2]?.replayMarker).toMatchObject({
       markerType: 'await_resolved',
       linkedAwaitId: 'await_r3_task_approval',
+    });
+  });
+
+  it('normalizes runtime-exported commitment submissions and public-event deltas', () => {
+    const exported = exportRuntimeAcpIngress(runtimeFixture);
+    const commitmentEnvelope = exported.find((envelope) => envelope.kind === 'commitment_submitted');
+    const voteRevealEnvelope = exported.find(
+      (envelope) => envelope.kind === 'public_event' && envelope.payload.event.kind === 'vote_reveal',
+    );
+    const scoreDeltaEnvelope = exported.find(
+      (envelope) => envelope.kind === 'public_event'
+        && envelope.payload.event.kind === 'score_delta'
+        && envelope.cursor.round === 3,
+    );
+
+    if (!commitmentEnvelope || !voteRevealEnvelope || !scoreDeltaEnvelope) {
+      throw new Error('expected exported ACP ingress to include commitment and public-event deltas');
+    }
+
+    expect(normalizeAcpIngressEnvelope(commitmentEnvelope).structuredCommitmentEnvelope).toMatchObject({
+      envelopeId: 'envelope_r3_agent_alpha',
+      round: 3,
+      status: 'sealed',
+    });
+    expect(normalizeAcpIngressEnvelope(voteRevealEnvelope).replayMarker).toMatchObject({
+      markerType: 'reveal',
+      label: 'Round 3 votes revealed',
+    });
+    expect(normalizeAcpIngressEnvelope(scoreDeltaEnvelope).publicEvent).toMatchObject({
+      kind: 'score_delta',
+      cursor: { round: 3, phase: 'task_scoring_debrief' },
     });
   });
 });

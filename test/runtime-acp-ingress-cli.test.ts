@@ -98,6 +98,28 @@ describe('runtime ACP ingress export cli lib', () => {
     expect(envelopes.some((envelope) => envelope.kind === 'await_resolved')).toBe(true);
   });
 
+  it('exports recap-critical runtime deltas as ACP envelopes', () => {
+    const richerInput = readFixture<DeterministicRunnerInput>('demo-match.input.json');
+    const envelopes = exportRuntimeAcpIngress(richerInput);
+
+    expect(envelopes.some((envelope) => envelope.kind === 'commitment_submitted')).toBe(true);
+    expect(
+      envelopes.some(
+        (envelope) => envelope.kind === 'public_event' && envelope.payload.event.kind === 'public_utterance',
+      ),
+    ).toBe(true);
+    expect(
+      envelopes.some(
+        (envelope) => envelope.kind === 'public_event' && envelope.payload.event.kind === 'vote_reveal',
+      ),
+    ).toBe(true);
+    expect(
+      envelopes.some(
+        (envelope) => envelope.kind === 'public_event' && envelope.payload.event.kind === 'score_delta',
+      ),
+    ).toBe(true);
+  });
+
   it('matches direct live-store/projection reduction through bridge and follow', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'agent-kumite-runtime-acp-'));
     const socketPath = join(dir, 'live.sock');

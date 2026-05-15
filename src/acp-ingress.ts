@@ -1,12 +1,15 @@
 import type {
   AcpAwaitOpenedEnvelope,
   AcpAwaitResolvedEnvelope,
+  AcpCommitmentSubmittedEnvelope,
   AcpIngressEnvelope,
   AcpPhaseTransitionEnvelope,
+  AcpPublicEventEnvelope,
   AwaitRecord,
   InterventionRecord,
   PublicEvent,
   ReplayMarker,
+  StructuredCommitmentEnvelope,
 } from './schema.js';
 
 export interface NormalizedAcpIngressRecordSet {
@@ -14,6 +17,7 @@ export interface NormalizedAcpIngressRecordSet {
   awaitRecord?: AwaitRecord;
   interventionRecord?: InterventionRecord;
   replayMarker?: ReplayMarker;
+  structuredCommitmentEnvelope?: StructuredCommitmentEnvelope;
 }
 
 function envelopeRecordId(envelopeId: string, suffix: string): string {
@@ -127,6 +131,92 @@ function normalizeAwaitResolvedEnvelope(
   };
 }
 
+function replayMarkerFromPublicEvent(event: PublicEvent): ReplayMarker | undefined {
+  switch (event.kind) {
+    case 'vote_reveal':
+      return {
+        markerId: `marker_${event.eventId}`,
+        runId: event.runId,
+        cursor: { ...event.cursor },
+        markerType: 'reveal',
+        label: `Round ${event.cursor.round} votes revealed`,
+        sourceEventIds: [event.eventId],
+      };
+    case 'commitment_reveal':
+      return {
+        markerId: `marker_${event.eventId}`,
+        runId: event.runId,
+        cursor: { ...event.cursor },
+        markerType: 'reveal',
+        label: `Round ${event.cursor.round} commitments revealed`,
+        sourceEventIds: [event.eventId],
+      };
+    case 'elimination':
+      return {
+        markerId: `marker_${event.eventId}`,
+        runId: event.runId,
+        cursor: { ...event.cursor },
+        markerType: 'elimination',
+        label: `Round ${event.cursor.round} elimination: ${event.actorAgentIds.join(', ')}`,
+        sourceEventIds: [event.eventId],
+      };
+    case 'score_delta':
+      return {
+        markerId: `marker_${event.eventId}`,
+        runId: event.runId,
+        cursor: { ...event.cursor },
+        markerType: 'bookmark',
+        label: `Round ${event.cursor.round} scores posted`,
+        sourceEventIds: [event.eventId],
+      };
+    default:
+      return undefined;
+  }
+}
+
+function normalizeCommitmentSubmittedEnvelope(
+  envelope: AcpCommitmentSubmittedEnvelope,
+): NormalizedAcpIngressRecordSet {
+  const commitmentEnvelope = envelope.payload.commitmentEnvelope;
+  return {
+    structuredCommitmentEnvelope: {
+      ...commitmentEnvelope,
+      runId: envelope.runId,
+      matchId: envelope.matchId,
+      round: envelope.cursor.round,
+      commitments: commitmentEnvelope.commitments.map((commitment) => ({
+        ...commitment,
+        round: envelope.cursor.round,
+      })),
+    },
+  };
+}
+
+function normalizePublicEventEnvelope(
+  envelope: AcpPublicEventEnvelope,
+): NormalizedAcpIngressRecordSet {
+  const event = envelope.payload.event;
+  const publicEvent: PublicEvent = {
+    ...event,
+    runId: envelope.runId,
+    matchId: envelope.matchId,
+    cursor: { ...envelope.cursor },
+    timestamp: envelope.timestamp,
+    actorAgentIds: [...event.actorAgentIds],
+    linkedCommitmentIds: [...event.linkedCommitmentIds],
+    commitmentClaims: event.commitmentClaims.map((claim) => ({
+      commitmentId: claim.commitmentId,
+      payload: claim.payload,
+    })),
+  };
+  const replayMarker = replayMarkerFromPublicEvent(publicEvent);
+
+  return {
+    publicEvent,
+    ...(replayMarker ? { replayMarker } : {}),
+  };
+}
+
 export function normalizeAcpIngressEnvelope(
   envelope: AcpIngressEnvelope,
 ): NormalizedAcpIngressRecordSet {
@@ -137,6 +227,10 @@ export function normalizeAcpIngressEnvelope(
       return normalizeAwaitOpenedEnvelope(envelope);
     case 'await_resolved':
       return normalizeAwaitResolvedEnvelope(envelope);
+    case 'commitment_submitted':
+      return normalizeCommitmentSubmittedEnvelope(envelope);
+    case 'public_event':
+      return normalizePublicEventEnvelope(envelope);
   }
 }
 

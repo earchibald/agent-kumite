@@ -598,6 +598,22 @@ export const AcpAwaitResolvedPayloadSchema = Type.Object(
 );
 export type AcpAwaitResolvedPayload = Static<typeof AcpAwaitResolvedPayloadSchema>;
 
+export const AcpCommitmentSubmittedPayloadSchema = Type.Object(
+  {
+    commitmentEnvelope: StructuredCommitmentEnvelopeSchema,
+  },
+  { $id: 'AcpCommitmentSubmittedPayload' },
+);
+export type AcpCommitmentSubmittedPayload = Static<typeof AcpCommitmentSubmittedPayloadSchema>;
+
+export const AcpPublicEventPayloadSchema = Type.Object(
+  {
+    event: PublicEventSchema,
+  },
+  { $id: 'AcpPublicEventPayload' },
+);
+export type AcpPublicEventPayload = Static<typeof AcpPublicEventPayloadSchema>;
+
 export const AcpPhaseTransitionEnvelopeSchema = Type.Object(
   {
     envelopeId: IdSchema,
@@ -643,11 +659,43 @@ export const AcpAwaitResolvedEnvelopeSchema = Type.Object(
 );
 export type AcpAwaitResolvedEnvelope = Static<typeof AcpAwaitResolvedEnvelopeSchema>;
 
+export const AcpCommitmentSubmittedEnvelopeSchema = Type.Object(
+  {
+    envelopeId: IdSchema,
+    kind: Type.Literal('commitment_submitted'),
+    runId: IdSchema,
+    matchId: IdSchema,
+    cursor: PhaseCursorSchema,
+    timestamp: TimestampSchema,
+    source: AcpIngressSourceSchema,
+    payload: AcpCommitmentSubmittedPayloadSchema,
+  },
+  { $id: 'AcpCommitmentSubmittedEnvelope' },
+);
+export type AcpCommitmentSubmittedEnvelope = Static<typeof AcpCommitmentSubmittedEnvelopeSchema>;
+
+export const AcpPublicEventEnvelopeSchema = Type.Object(
+  {
+    envelopeId: IdSchema,
+    kind: Type.Literal('public_event'),
+    runId: IdSchema,
+    matchId: IdSchema,
+    cursor: PhaseCursorSchema,
+    timestamp: TimestampSchema,
+    source: AcpIngressSourceSchema,
+    payload: AcpPublicEventPayloadSchema,
+  },
+  { $id: 'AcpPublicEventEnvelope' },
+);
+export type AcpPublicEventEnvelope = Static<typeof AcpPublicEventEnvelopeSchema>;
+
 export const AcpIngressEnvelopeSchema = Type.Union(
   [
     AcpPhaseTransitionEnvelopeSchema,
     AcpAwaitOpenedEnvelopeSchema,
     AcpAwaitResolvedEnvelopeSchema,
+    AcpCommitmentSubmittedEnvelopeSchema,
+    AcpPublicEventEnvelopeSchema,
   ],
   { $id: 'AcpIngressEnvelope' },
 );

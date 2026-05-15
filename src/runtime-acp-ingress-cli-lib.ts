@@ -6,11 +6,15 @@ import { runDeterministicMatch, type DeterministicRunnerInput } from './runner.j
 import type {
   AcpAwaitOpenedEnvelope,
   AcpAwaitResolvedEnvelope,
+  AcpCommitmentSubmittedEnvelope,
   AcpIngressEnvelope,
   AcpPhaseTransitionEnvelope,
+  AcpPublicEventEnvelope,
   AwaitRecord,
   MatchState,
+  PublicEvent,
   RoundPhase,
+  StructuredCommitmentEnvelope,
 } from './schema.js';
 
 const ROUND_PHASE_ORDER: readonly RoundPhase[] = [
@@ -192,12 +196,77 @@ function awaitResolvedEnvelope(input: DeterministicRunnerInput, round: number, a
   };
 }
 
+function commitmentSubmittedEnvelope(
+  input: DeterministicRunnerInput,
+  commitmentEnvelope: StructuredCommitmentEnvelope,
+  sequence: number,
+): AcpCommitmentSubmittedEnvelope {
+  return {
+    envelopeId: `${commitmentEnvelope.envelopeId}:submitted`,
+    kind: 'commitment_submitted',
+    runId: input.manifest.runId,
+    matchId: input.manifest.matchId,
+    cursor: {
+      round: commitmentEnvelope.round,
+      phase: 'structured_commitment_submission',
+    },
+    timestamp: commitmentEnvelope.sealedAt,
+    source: {
+      sessionId: 'session_runtime_exporter',
+      serverId: 'runtime_exporter',
+      messageId: `msg_commitment_${sequence + 1}`,
+    },
+    payload: {
+      commitmentEnvelope,
+    },
+  };
+}
+
+function publicEventEnvelope(
+  input: DeterministicRunnerInput,
+  event: PublicEvent,
+  sequence: number,
+): AcpPublicEventEnvelope {
+  return {
+    envelopeId: `acp_env_${event.eventId}`,
+    kind: 'public_event',
+    runId: input.manifest.runId,
+    matchId: input.manifest.matchId,
+    cursor: { ...event.cursor },
+    timestamp: event.timestamp,
+    source: {
+      sessionId: 'session_runtime_exporter',
+      serverId: 'runtime_exporter',
+      messageId: `msg_event_${sequence + 1}`,
+    },
+    payload: {
+      event,
+    },
+  };
+}
+
 export function exportRuntimeAcpIngress(
   input: DeterministicRunnerInput,
 ): AcpIngressEnvelope[] {
   const result = runDeterministicMatch(input);
   const envelopes: AcpIngressEnvelope[] = [];
   let phaseSequence = 0;
+  let deltaSequence = 0;
+  const publicEventsByCursor = new Map<string, PublicEvent[]>();
+
+  for (const event of result.publicEvents) {
+    const key = `${event.cursor.round}:${event.cursor.phase}`;
+    const existing = publicEventsByCursor.get(key) ?? [];
+    existing.push(event);
+    publicEventsByCursor.set(key, existing);
+  }
+
+  function emitCursorPublicEvents(round: number, phase: RoundPhase): void {
+    for (const event of publicEventsByCursor.get(`${round}:${phase}`) ?? []) {
+      envelopes.push(publicEventEnvelope(input, event, deltaSequence));
+      deltaSequence += 1;
+    }
+  }
 
   for (let index = 0; index < input.rounds.length; index += 1) {
     const round = index + 1;
@@ -212,10 +281,21 @@ export function exportRuntimeAcpIngress(
       'task_scoring_debrief',
     ];
 
+    emitCursorPublicEvents(round, 'cast_intro');
+
     let fromPhase: RoundPhase = 'cast_intro';
     for (const toPhase of phases) {
       envelopes.push(transitionEnvelope(input, round, fromPhase, toPhase, phaseSequence));
       phaseSequence += 1;
+
+      if (toPhase === 'structured_commitment_submission') {
+        for (const commitmentEnvelope of input.rounds[index]?.structuredCommitments ?? []) {
+          envelopes.push(commitmentSubmittedEnvelope(input, commitmentEnvelope, deltaSequence));
+          deltaSequence += 1;
+        }
+      }
+
+      emitCursorPublicEvents(round, toPhase);
 
       if (toPhase === 'task_submission') {
         for (const awaitRecord of input.rounds[index]?.awaitingDefaults ?? []) {

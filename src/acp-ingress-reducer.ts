@@ -1,7 +1,10 @@
 import {
+  addStructuredCommitmentEnvelopes,
+  applyScoreDeltas,
   createInitialMatchState,
   createReplayBundle,
   dmBudgetForRound,
+  revealStructuredCommitments,
   snapshotFromMatchState,
 } from './engine.js';
 import { normalizeAcpIngressEnvelope } from './acp-ingress.js';
@@ -103,6 +106,17 @@ function removeId(values: readonly string[], value: string): string[] {
   return values.filter((current) => current !== value);
 }
 
+function scoreDeltasFromPublicEvent(event: PublicEvent): Record<string, number> {
+  const deltas = event.payload.deltas;
+  if (!deltas || typeof deltas !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(deltas).filter((entry): entry is [string, number] => typeof entry[1] === 'number'),
+  );
+}
+
 function applyEnvelopeToState(
   state: AcpIngressReducerState,
   envelope: AcpIngressEnvelope,
@@ -131,8 +145,35 @@ function applyEnvelopeToState(
     current: { ...envelope.cursor },
   };
 
+  if (normalized.structuredCommitmentEnvelope) {
+    nextMatchState = addStructuredCommitmentEnvelopes(nextMatchState, [normalized.structuredCommitmentEnvelope]);
+  }
+
   if (normalized.publicEvent) {
     nextPublicEvents.push(normalized.publicEvent);
+    if (normalized.publicEvent.kind === 'commitment_reveal') {
+      nextMatchState = revealStructuredCommitments(nextMatchState, normalized.publicEvent.timestamp).state;
+    } else if (normalized.publicEvent.kind === 'score_delta') {
+      nextMatchState = {
+        ...nextMatchState,
+        scoreByAgent: applyScoreDeltas(
+          nextMatchState.scoreByAgent,
+          scoreDeltasFromPublicEvent(normalized.publicEvent),
+        ),
+      };
+    } else if (normalized.publicEvent.kind === 'elimination') {
+      const [eliminatedAgentId] = normalized.publicEvent.actorAgentIds;
+      if (eliminatedAgentId) {
+        nextMatchState = {
+          ...nextMatchState,
+          aliveAgentIds: removeId(nextMatchState.aliveAgentIds, eliminatedAgentId),
+          eliminatedAgentIds: appendUniqueId(nextMatchState.eliminatedAgentIds, eliminatedAgentId),
+          dmBudgetByAgent: Object.fromEntries(
+            Object.entries(nextMatchState.dmBudgetByAgent).filter(([agentId]) => agentId !== eliminatedAgentId),
+          ),
+        };
+      }
+    }
     nextMatchState = {
       ...nextMatchState,
       layers: {
