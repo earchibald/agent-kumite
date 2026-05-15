@@ -1,5 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 import {
   appendAcpIngressEnvelopesToRunStore,
@@ -9,6 +8,7 @@ import {
 } from './acp-live-run-store.js';
 import { readAcpLiveFileInputs } from './acp-live-file-input.js';
 import { readAcpLiveRunStoreFromFile } from './acp-live-run-store-file.js';
+import { writeLiveControlRoomProjectionToFile } from './live-projection-file.js';
 
 export interface LiveProjectionCliOptions {
   manifestPath?: string;
@@ -119,8 +119,7 @@ export async function writeLiveControlRoomProjectionFromFiles(
   }
   const projection = currentAcpLiveControlRoomProjection(store);
 
-  await mkdir(dirname(options.outputPath), { recursive: true });
-  await writeFile(options.outputPath, JSON.stringify(projection, null, options.pretty ? 2 : undefined));
+  await writeLiveControlRoomProjectionToFile(options.outputPath, projection, options.pretty);
   return { outputPath: options.outputPath };
 }
 
