@@ -1,12 +1,11 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 import {
   appendAcpIngressEnvelopesToRunStore,
   createAcpLiveRunStore,
-  serializeAcpLiveRunStore,
 } from './acp-live-run-store.js';
 import { readAcpLiveFileInputs } from './acp-live-file-input.js';
+import { writeAcpLiveRunStoreToFile } from './acp-live-run-store-file.js';
 
 export interface LiveRunStoreCliOptions {
   manifestPath: string;
@@ -105,11 +104,8 @@ export async function writeAcpLiveRunStoreFromFiles(
     }),
     inputs.ingress,
   );
-  const serialized = serializeAcpLiveRunStore(store);
-
-  await mkdir(dirname(options.outputPath), { recursive: true });
-  await writeFile(options.outputPath, JSON.stringify(serialized, null, options.pretty ? 2 : undefined));
-  return { outputPath: options.outputPath };
+  const outputPath = await writeAcpLiveRunStoreToFile(options.outputPath, store, options.pretty);
+  return { outputPath };
 }
 
 export function liveRunStoreUsageText(): string {
