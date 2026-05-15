@@ -12,6 +12,8 @@ This repo lets you:
 
 The current implementation is local and fixture-driven. It is the artifact / benchmark / operator-view pipeline underneath the future ACP-backed live surfaces.
 
+If you want the fast orientation version of this repo — what is available, what you can do, and why each path exists — read [`GUIDED-TOUR.md`](./GUIDED-TOUR.md).
+
 ## Prerequisites
 
 - Node.js
