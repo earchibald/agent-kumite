@@ -552,6 +552,106 @@ export const InterventionRecordSchema = Type.Object(
 );
 export type InterventionRecord = Static<typeof InterventionRecordSchema>;
 
+export const AcpIngressSourceSchema = Type.Object(
+  {
+    sessionId: IdSchema,
+    serverId: Type.Optional(IdSchema),
+    agentId: Type.Optional(IdSchema),
+    messageId: Type.Optional(IdSchema),
+  },
+  { $id: 'AcpIngressSource' },
+);
+export type AcpIngressSource = Static<typeof AcpIngressSourceSchema>;
+
+export const AcpPhaseTransitionPayloadSchema = Type.Object(
+  {
+    fromPhase: RoundPhaseSchema,
+    toPhase: RoundPhaseSchema,
+    actorAgentIds: Type.Array(IdSchema, { uniqueItems: true }),
+    linkedCommitmentIds: Type.Array(IdSchema, { uniqueItems: true }),
+    commitmentClaims: Type.Array(CommitmentClaimSchema),
+    summary: Type.String({ minLength: 1 }),
+    metadata: MetadataSchema,
+  },
+  { $id: 'AcpPhaseTransitionPayload' },
+);
+export type AcpPhaseTransitionPayload = Static<typeof AcpPhaseTransitionPayloadSchema>;
+
+export const AcpAwaitOpenedPayloadSchema = Type.Object(
+  {
+    await: AwaitRecordSchema,
+  },
+  { $id: 'AcpAwaitOpenedPayload' },
+);
+export type AcpAwaitOpenedPayload = Static<typeof AcpAwaitOpenedPayloadSchema>;
+
+export const AcpAwaitResolvedPayloadSchema = Type.Object(
+  {
+    awaitId: IdSchema,
+    status: AwaitStatusSchema,
+    choiceId: Type.Optional(Type.String({ minLength: 1 })),
+    operatorId: Type.Optional(Type.String({ minLength: 1 })),
+    resolvedAt: TimestampSchema,
+  },
+  { $id: 'AcpAwaitResolvedPayload' },
+);
+export type AcpAwaitResolvedPayload = Static<typeof AcpAwaitResolvedPayloadSchema>;
+
+export const AcpPhaseTransitionEnvelopeSchema = Type.Object(
+  {
+    envelopeId: IdSchema,
+    kind: Type.Literal('phase_transition'),
+    runId: IdSchema,
+    matchId: IdSchema,
+    cursor: PhaseCursorSchema,
+    timestamp: TimestampSchema,
+    source: AcpIngressSourceSchema,
+    payload: AcpPhaseTransitionPayloadSchema,
+  },
+  { $id: 'AcpPhaseTransitionEnvelope' },
+);
+export type AcpPhaseTransitionEnvelope = Static<typeof AcpPhaseTransitionEnvelopeSchema>;
+
+export const AcpAwaitOpenedEnvelopeSchema = Type.Object(
+  {
+    envelopeId: IdSchema,
+    kind: Type.Literal('await_opened'),
+    runId: IdSchema,
+    matchId: IdSchema,
+    cursor: PhaseCursorSchema,
+    timestamp: TimestampSchema,
+    source: AcpIngressSourceSchema,
+    payload: AcpAwaitOpenedPayloadSchema,
+  },
+  { $id: 'AcpAwaitOpenedEnvelope' },
+);
+export type AcpAwaitOpenedEnvelope = Static<typeof AcpAwaitOpenedEnvelopeSchema>;
+
+export const AcpAwaitResolvedEnvelopeSchema = Type.Object(
+  {
+    envelopeId: IdSchema,
+    kind: Type.Literal('await_resolved'),
+    runId: IdSchema,
+    matchId: IdSchema,
+    cursor: PhaseCursorSchema,
+    timestamp: TimestampSchema,
+    source: AcpIngressSourceSchema,
+    payload: AcpAwaitResolvedPayloadSchema,
+  },
+  { $id: 'AcpAwaitResolvedEnvelope' },
+);
+export type AcpAwaitResolvedEnvelope = Static<typeof AcpAwaitResolvedEnvelopeSchema>;
+
+export const AcpIngressEnvelopeSchema = Type.Union(
+  [
+    AcpPhaseTransitionEnvelopeSchema,
+    AcpAwaitOpenedEnvelopeSchema,
+    AcpAwaitResolvedEnvelopeSchema,
+  ],
+  { $id: 'AcpIngressEnvelope' },
+);
+export type AcpIngressEnvelope = Static<typeof AcpIngressEnvelopeSchema>;
+
 export const ReplayStateSchema = Type.Object(
   {
     cursor: PhaseCursorSchema,

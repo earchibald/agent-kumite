@@ -2,6 +2,7 @@ import type { TSchema } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 
 import {
+  AcpIngressEnvelopeSchema,
   ArtifactBundleSchema,
   AwaitKind,
   AwaitRecordSchema,
@@ -52,6 +53,10 @@ export function validateMatchState(value: unknown): string[] {
 
 export function validateAwaitRecord(value: unknown): string[] {
   return validateWith(AwaitRecordSchema, value);
+}
+
+export function validateAcpIngressEnvelope(value: unknown): string[] {
+  return validateWith(AcpIngressEnvelopeSchema, value);
 }
 
 export function validateReplayBundle(value: unknown): string[] {
