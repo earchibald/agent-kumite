@@ -102,6 +102,7 @@
     },
     "payload": {
       "awaitId": "await_r3_task_approval",
+      "kind": "approval",
       "status": "resolved",
       "choiceId": "approve",
       "operatorId": "operator-1",

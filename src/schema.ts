@@ -588,6 +588,7 @@ export type AcpAwaitOpenedPayload = Static<typeof AcpAwaitOpenedPayloadSchema>;
 export const AcpAwaitResolvedPayloadSchema = Type.Object(
   {
     awaitId: IdSchema,
+    kind: AwaitKindSchema,
     status: AwaitStatusSchema,
     choiceId: Type.Optional(Type.String({ minLength: 1 })),
     operatorId: Type.Optional(Type.String({ minLength: 1 })),

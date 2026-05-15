@@ -68,6 +68,7 @@ describe('ACP ingress normalization', () => {
 
     expect(normalized[2]?.interventionRecord).toMatchObject({
       awaitId: 'await_r3_task_approval',
+      kind: 'approval',
       status: 'resolved',
       choiceId: 'approve',
       operatorId: 'operator-1',

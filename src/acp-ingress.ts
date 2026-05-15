@@ -108,7 +108,7 @@ function normalizeAwaitResolvedEnvelope(
       cursor: { ...envelope.cursor },
       layer: 'intervention',
       awaitId: envelope.payload.awaitId,
-      kind: 'approval',
+      kind: envelope.payload.kind,
       status: envelope.payload.status,
       ...(envelope.payload.choiceId ? { choiceId: envelope.payload.choiceId } : {}),
       ...(envelope.payload.operatorId ? { operatorId: envelope.payload.operatorId } : {}),
