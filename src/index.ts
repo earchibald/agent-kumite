@@ -12,6 +12,7 @@ export * from './live-projection-cli-lib.js';
 export * from './acp-live-run-store-file.js';
 export * from './live-run-store-cli-lib.js';
 export * from './live-store-append-cli-lib.js';
+export * from './live-ingestion-socket.js';
 export * from './replay.js';
 export * from './replay-cli-lib.js';
 export * from './bundle-cli-lib.js';
