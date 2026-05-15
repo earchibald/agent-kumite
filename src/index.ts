@@ -3,6 +3,7 @@ export * from './validate.js';
 export * from './engine.js';
 export * from './runner.js';
 export * from './runtime-acp-ingress-cli-lib.js';
+export * from './runtime-live-stream-cli-lib.js';
 export * from './cli-lib.js';
 export * from './report.js';
 export * from './report-cli-lib.js';
