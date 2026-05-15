@@ -10,18 +10,18 @@ import {
 import type { AcpIngressEnvelope, PersistedAcpLiveRunStore } from './schema.js';
 import type { LiveControlRoomProjection } from './projection.js';
 
-const PROTOCOL_VERSION = 1;
+export const LIVE_INGESTION_SOCKET_PROTOCOL_VERSION = 1;
 
-type OneShotRequestType = 'append_ingress' | 'get_store' | 'get_projection';
-type RequestType = OneShotRequestType | 'subscribe_run';
-type ResponseType = 'append_ingress_ok' | 'get_store_ok' | 'get_projection_ok' | 'subscribed' | 'error';
-type SubscriptionEventType = 'store_updated' | 'server_stopping' | 'store_snapshot' | 'projection_snapshot' | 'stream_error';
-type SubscriptionFilterType = 'store_updated' | 'server_stopping';
-type InitialSnapshotMode = 'none' | 'store' | 'projection';
+export type LiveSocketOneShotRequestType = 'append_ingress' | 'get_store' | 'get_projection';
+export type LiveSocketRequestType = LiveSocketOneShotRequestType | 'subscribe_run';
+export type LiveSocketResponseType = 'append_ingress_ok' | 'get_store_ok' | 'get_projection_ok' | 'subscribed' | 'error';
+export type LiveSocketSubscriptionEventType = 'store_updated' | 'server_stopping' | 'store_snapshot' | 'projection_snapshot' | 'stream_error';
+export type LiveSocketSubscriptionFilterType = 'store_updated' | 'server_stopping';
+export type LiveSocketInitialSnapshotMode = 'none' | 'store' | 'projection';
 
 export interface LiveSocketRequest {
   protocol_version: number;
-  type: RequestType;
+  type: LiveSocketRequestType;
   request_id: string;
   run_id: string;
   payload: Record<string, unknown>;
@@ -29,7 +29,7 @@ export interface LiveSocketRequest {
 
 export interface LiveSocketSuccessResponse {
   protocol_version: number;
-  type: Exclude<ResponseType, 'error'>;
+  type: Exclude<LiveSocketResponseType, 'error'>;
   request_id: string;
   run_id: string;
   payload: Record<string, unknown>;
@@ -49,7 +49,7 @@ export interface LiveSocketErrorResponse {
 
 export interface LiveSocketSubscriptionEvent {
   protocol_version: number;
-  type: SubscriptionEventType;
+  type: LiveSocketSubscriptionEventType;
   run_id: string;
   payload: Record<string, unknown>;
 }
@@ -71,11 +71,11 @@ interface StoredResponseEntry {
 interface Subscriber {
   socket: net.Socket;
   runId: string;
-  requestedEvents: Set<SubscriptionFilterType>;
+  requestedEvents: Set<LiveSocketSubscriptionFilterType>;
   queue: string[];
   flushing: boolean;
   closed: boolean;
-  initialSnapshot: InitialSnapshotMode;
+  initialSnapshot: LiveSocketInitialSnapshotMode;
 }
 
 function encodeMessage(message: LiveSocketServerMessage): string {
@@ -102,7 +102,7 @@ function parseRequest(line: string): LiveSocketRequest {
   const runId = parsed.run_id;
   const payload = parsed.payload;
 
-  if (protocolVersion !== PROTOCOL_VERSION) {
+  if (protocolVersion !== LIVE_INGESTION_SOCKET_PROTOCOL_VERSION) {
     throw new Error('unsupported protocol version');
   }
 
@@ -136,12 +136,12 @@ function parseRequest(line: string): LiveSocketRequest {
   };
 }
 
-function parseSubscriptionFilterEvents(value: unknown): Set<SubscriptionFilterType> {
+function parseSubscriptionFilterEvents(value: unknown): Set<LiveSocketSubscriptionFilterType> {
   if (!Array.isArray(value)) {
     throw new Error('subscribe_run payload.events must be an array');
   }
 
-  const events = new Set<SubscriptionFilterType>();
+  const events = new Set<LiveSocketSubscriptionFilterType>();
   for (const item of value) {
     if (item !== 'store_updated' && item !== 'server_stopping') {
       throw new Error(`unsupported subscribe_run event ${String(item)}`);
@@ -151,7 +151,7 @@ function parseSubscriptionFilterEvents(value: unknown): Set<SubscriptionFilterTy
   return events;
 }
 
-function parseInitialSnapshotMode(value: unknown): InitialSnapshotMode {
+function parseInitialSnapshotMode(value: unknown): LiveSocketInitialSnapshotMode {
   if (value === undefined) {
     return 'none';
   }
@@ -300,8 +300,8 @@ export class LiveIngestionSocketServer {
       return;
     }
 
-    let requestedEvents: Set<SubscriptionFilterType>;
-    let initialSnapshot: InitialSnapshotMode;
+    let requestedEvents: Set<LiveSocketSubscriptionFilterType>;
+    let initialSnapshot: LiveSocketInitialSnapshotMode;
     try {
       requestedEvents = parseSubscriptionFilterEvents(request.payload.events);
       initialSnapshot = parseInitialSnapshotMode(request.payload.initial_snapshot);
@@ -328,7 +328,7 @@ export class LiveIngestionSocketServer {
     socket.on('error', () => this.removeSubscriber(subscriber));
 
     this.enqueueSubscriberMessage(subscriber, {
-      protocol_version: PROTOCOL_VERSION,
+      protocol_version: LIVE_INGESTION_SOCKET_PROTOCOL_VERSION,
       type: 'subscribed',
       request_id: request.request_id,
       run_id: request.run_id,
@@ -381,7 +381,7 @@ export class LiveIngestionSocketServer {
     this.storeRevisions.set(request.run_id, nextRevision);
 
     const response: LiveSocketSuccessResponse = {
-      protocol_version: PROTOCOL_VERSION,
+      protocol_version: LIVE_INGESTION_SOCKET_PROTOCOL_VERSION,
       type: 'append_ingress_ok',
       request_id: request.request_id,
       run_id: request.run_id,
@@ -405,7 +405,7 @@ export class LiveIngestionSocketServer {
 
     const serialized: PersistedAcpLiveRunStore = serializeAcpLiveRunStore(store);
     return {
-      protocol_version: PROTOCOL_VERSION,
+      protocol_version: LIVE_INGESTION_SOCKET_PROTOCOL_VERSION,
       type: 'get_store_ok',
       request_id: request.request_id,
       run_id: request.run_id,
@@ -424,7 +424,7 @@ export class LiveIngestionSocketServer {
 
     const projection: LiveControlRoomProjection = currentAcpLiveControlRoomProjection(store);
     return {
-      protocol_version: PROTOCOL_VERSION,
+      protocol_version: LIVE_INGESTION_SOCKET_PROTOCOL_VERSION,
       type: 'get_projection_ok',
       request_id: request.request_id,
       run_id: request.run_id,
@@ -442,7 +442,7 @@ export class LiveIngestionSocketServer {
     }
 
     const event: LiveSocketSubscriptionEvent = {
-      protocol_version: PROTOCOL_VERSION,
+      protocol_version: LIVE_INGESTION_SOCKET_PROTOCOL_VERSION,
       type: 'store_updated',
       run_id: runId,
       payload: {
@@ -464,7 +464,7 @@ export class LiveIngestionSocketServer {
     for (const [, subscribers] of this.subscribersByRun) {
       for (const subscriber of subscribers) {
         this.enqueueSubscriberMessage(subscriber, {
-          protocol_version: PROTOCOL_VERSION,
+          protocol_version: LIVE_INGESTION_SOCKET_PROTOCOL_VERSION,
           type: 'server_stopping',
           run_id: subscriber.runId,
           payload: {
@@ -480,7 +480,7 @@ export class LiveIngestionSocketServer {
 
   private storeSnapshotEvent(runId: string, store: AcpLiveRunStore): LiveSocketSubscriptionEvent {
     return {
-      protocol_version: PROTOCOL_VERSION,
+      protocol_version: LIVE_INGESTION_SOCKET_PROTOCOL_VERSION,
       type: 'store_snapshot',
       run_id: runId,
       payload: {
@@ -492,7 +492,7 @@ export class LiveIngestionSocketServer {
 
   private projectionSnapshotEvent(runId: string, store: AcpLiveRunStore): LiveSocketSubscriptionEvent {
     return {
-      protocol_version: PROTOCOL_VERSION,
+      protocol_version: LIVE_INGESTION_SOCKET_PROTOCOL_VERSION,
       type: 'projection_snapshot',
       run_id: runId,
       payload: {
@@ -551,7 +551,7 @@ export class LiveIngestionSocketServer {
     }
 
     subscriber.socket.write(encodeMessage({
-      protocol_version: PROTOCOL_VERSION,
+      protocol_version: LIVE_INGESTION_SOCKET_PROTOCOL_VERSION,
       type: 'stream_error',
       run_id: subscriber.runId,
       payload: {
@@ -588,7 +588,7 @@ export class LiveIngestionSocketServer {
     retryable: boolean,
   ): LiveSocketErrorResponse {
     return {
-      protocol_version: PROTOCOL_VERSION,
+      protocol_version: LIVE_INGESTION_SOCKET_PROTOCOL_VERSION,
       type: 'error',
       request_id: request.request_id,
       run_id: request.run_id,

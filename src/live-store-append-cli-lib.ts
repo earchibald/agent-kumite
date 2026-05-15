@@ -1,9 +1,8 @@
-import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+import { readAcpIngressEnvelopeListFromFile } from './acp-ingress-file.js';
 import { appendAcpIngressEnvelopesToRunStore } from './acp-live-run-store.js';
 import { readAcpLiveRunStoreFromFile, writeAcpLiveRunStoreToFile } from './acp-live-run-store-file.js';
-import type { AcpIngressEnvelope } from './schema.js';
 
 export interface LiveStoreAppendCliOptions {
   storeInputPath: string;
@@ -74,22 +73,12 @@ export function parseLiveStoreAppendCliArgs(args: readonly string[]): LiveStoreA
   };
 }
 
-async function readAcpIngressEnvelopeList(path: string): Promise<AcpIngressEnvelope[]> {
-  const raw = await readFile(path, 'utf8');
-  const parsed = JSON.parse(raw) as unknown;
-  if (!Array.isArray(parsed)) {
-    throw new Error(`ACP ingress ${path} must be a JSON array`);
-  }
-
-  return parsed as AcpIngressEnvelope[];
-}
-
 export async function appendAcpLiveRunStoreFromFiles(
   options: LiveStoreAppendCliOptions,
 ): Promise<LiveStoreAppendCliResult> {
   const [store, ingress] = await Promise.all([
     readAcpLiveRunStoreFromFile(options.storeInputPath),
-    readAcpIngressEnvelopeList(options.ingressPath),
+    readAcpIngressEnvelopeListFromFile(options.ingressPath),
   ]);
   const updatedStore = appendAcpIngressEnvelopesToRunStore(store, ingress);
   const outputPath = await writeAcpLiveRunStoreToFile(options.outputPath, updatedStore, options.pretty);
