@@ -4,11 +4,11 @@ import { dirname, resolve } from 'node:path';
 import {
   appendAcpIngressEnvelopesToRunStore,
   createAcpLiveRunStore,
-  currentAcpLiveControlRoomProjection,
+  serializeAcpLiveRunStore,
 } from './acp-live-run-store.js';
 import { readAcpLiveFileInputs } from './acp-live-file-input.js';
 
-export interface LiveProjectionCliOptions {
+export interface LiveRunStoreCliOptions {
   manifestPath: string;
   rosterPath: string;
   ingressPath: string;
@@ -16,11 +16,11 @@ export interface LiveProjectionCliOptions {
   pretty: boolean;
 }
 
-export interface LiveProjectionCliResult {
+export interface LiveRunStoreCliResult {
   outputPath: string;
 }
 
-export function parseLiveProjectionCliArgs(args: readonly string[]): LiveProjectionCliOptions {
+export function parseLiveRunStoreCliArgs(args: readonly string[]): LiveRunStoreCliOptions {
   let manifestPath: string | undefined;
   let rosterPath: string | undefined;
   let ingressPath: string | undefined;
@@ -78,7 +78,7 @@ export function parseLiveProjectionCliArgs(args: readonly string[]): LiveProject
   }
 
   if (!outputPath) {
-    throw new Error('missing required --output <live-control-room.json>');
+    throw new Error('missing required --output <live-run-store.json>');
   }
 
   return {
@@ -90,15 +90,14 @@ export function parseLiveProjectionCliArgs(args: readonly string[]): LiveProject
   };
 }
 
-export async function writeLiveControlRoomProjectionFromFiles(
-  options: LiveProjectionCliOptions,
-): Promise<LiveProjectionCliResult> {
+export async function writeAcpLiveRunStoreFromFiles(
+  options: LiveRunStoreCliOptions,
+): Promise<LiveRunStoreCliResult> {
   const inputs = await readAcpLiveFileInputs({
     manifestPath: options.manifestPath,
     rosterPath: options.rosterPath,
     ingressPath: options.ingressPath,
   });
-
   const store = appendAcpIngressEnvelopesToRunStore(
     createAcpLiveRunStore({
       manifest: inputs.manifest,
@@ -106,13 +105,13 @@ export async function writeLiveControlRoomProjectionFromFiles(
     }),
     inputs.ingress,
   );
-  const projection = currentAcpLiveControlRoomProjection(store);
+  const serialized = serializeAcpLiveRunStore(store);
 
   await mkdir(dirname(options.outputPath), { recursive: true });
-  await writeFile(options.outputPath, JSON.stringify(projection, null, options.pretty ? 2 : undefined));
+  await writeFile(options.outputPath, JSON.stringify(serialized, null, options.pretty ? 2 : undefined));
   return { outputPath: options.outputPath };
 }
 
-export function liveProjectionUsageText(): string {
-  return 'Usage: agent-kumite-live-project --manifest <run-manifest.json> --roster <roster.json> --ingress <acp-ingress.json> --output <live-control-room.json> [--pretty]';
+export function liveRunStoreUsageText(): string {
+  return 'Usage: agent-kumite-live-store --manifest <run-manifest.json> --roster <roster.json> --ingress <acp-ingress.json> --output <live-run-store.json> [--pretty]';
 }

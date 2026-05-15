@@ -3,6 +3,7 @@ import { Value } from '@sinclair/typebox/value';
 
 import {
   AcpIngressEnvelopeSchema,
+  AcpLiveRunStoreSchema,
   ArtifactBundleSchema,
   AwaitKind,
   AwaitRecordSchema,
@@ -57,6 +58,10 @@ export function validateAwaitRecord(value: unknown): string[] {
 
 export function validateAcpIngressEnvelope(value: unknown): string[] {
   return validateWith(AcpIngressEnvelopeSchema, value);
+}
+
+export function validateAcpLiveRunStore(value: unknown): string[] {
+  return validateWith(AcpLiveRunStoreSchema, value);
 }
 
 export function validateReplayBundle(value: unknown): string[] {

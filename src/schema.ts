@@ -844,7 +844,32 @@ export const ArtifactBundleSchema = Type.Object(
 );
 export type ArtifactBundle = Static<typeof ArtifactBundleSchema>;
 
+export const PersistedAcpIngressReducerStateSchema = Type.Object(
+  {
+    matchState: MatchStateSchema,
+    awaitRecords: Type.Array(AwaitRecordSchema),
+    publicEvents: Type.Array(PublicEventSchema),
+    interventions: Type.Array(InterventionRecordSchema),
+    markers: Type.Array(ReplayMarkerSchema),
+    snapshots: Type.Array(ReplaySnapshotSchema),
+    replayBundle: ReplayBundleSchema,
+  },
+  { $id: 'PersistedAcpIngressReducerState' },
+);
+export type PersistedAcpIngressReducerState = Static<typeof PersistedAcpIngressReducerStateSchema>;
+
+export const AcpLiveRunStoreSchema = Type.Object(
+  {
+    manifest: RunManifestSchema,
+    roster: Type.Array(RosterEntrySchema, { minItems: 6, maxItems: 6 }),
+    state: PersistedAcpIngressReducerStateSchema,
+  },
+  { $id: 'AcpLiveRunStore' },
+);
+export type PersistedAcpLiveRunStore = Static<typeof AcpLiveRunStoreSchema>;
+
 export const RuntimeSchemas = {
+  AcpLiveRunStoreSchema,
   AlertRecordSchema,
   ArtifactBundleSchema,
   AwaitRecordSchema,
@@ -864,6 +889,7 @@ export const RuntimeSchemas = {
   LinkSourceKindSchema,
   MatchStateSchema,
   PhaseCursorSchema,
+  PersistedAcpIngressReducerStateSchema,
   PublicEventSchema,
   ReplayBundleSchema,
   ReplayMarkerSchema,
