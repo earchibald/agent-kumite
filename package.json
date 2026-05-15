@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "simulate": "node dist/cli.js",
     "report": "node dist/report-cli.js",
+    "live-export-acp": "node dist/runtime-acp-ingress-cli.js",
     "project": "node dist/projection-cli.js",
     "live-store": "node dist/live-run-store-cli.js",
     "live-append": "node dist/live-store-append-cli.js",
@@ -29,6 +30,7 @@
   "bin": {
     "agent-kumite-harness": "./dist/cli.js",
     "agent-kumite-report": "./dist/report-cli.js",
+    "agent-kumite-live-export-acp": "./dist/runtime-acp-ingress-cli.js",
     "agent-kumite-project": "./dist/projection-cli.js",
     "agent-kumite-live-store": "./dist/live-run-store-cli.js",
     "agent-kumite-live-append": "./dist/live-store-append-cli.js",
