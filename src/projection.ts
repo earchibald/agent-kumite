@@ -1,5 +1,7 @@
 import type {
+  AwaitRecord,
   AlertRecord,
+  MatchState,
   ArtifactBundle,
   InterventionRecord,
   PhaseCursor,
@@ -8,9 +10,11 @@ import type {
   RosterEntry,
   RoundPhase,
   StructuredCommitmentEnvelope,
+  RunManifest,
 } from './schema.js';
 import { ROUND_PHASE_ORDER } from './schema.js';
 import { createAftermathReport, type AftermathReport } from './report.js';
+import type { AcpIngressReducerState } from './acp-ingress-reducer.js';
 
 const PHASE_INDEX = new Map<RoundPhase, number>(ROUND_PHASE_ORDER.map((phase, index) => [phase, index]));
 const DISABLED_PHASE_ONE_INTERVENTIONS = ['role_change', 'freeze', 'ejection'] as const;
@@ -100,6 +104,32 @@ export interface ControlRoomProjection {
   aftermath: AftermathReport;
 }
 
+export interface LiveAwaitingQueueItem {
+  awaitId: string;
+  kind: AwaitRecord['kind'];
+  prompt: string;
+  status: AwaitRecord['status'];
+  openedAt: string;
+  openedBy: string;
+  choiceIds: string[];
+  latestInterventionId: string | null;
+}
+
+export interface LiveControlRoomProjection {
+  manifest: RunManifest;
+  home: ControlRoomHomeSummary;
+  callsheet: CallsheetRow[];
+  layeredSnapshots: LayeredCursorSnapshot[];
+  replay: ControlRoomProjection['replay'];
+  live: {
+    matchStatus: MatchState['status'];
+    openAwaitIds: string[];
+    awaitingQueue: LiveAwaitingQueueItem[];
+    publicEventCount: number;
+    interventionCount: number;
+  };
+}
+
 function compareCursor(left: PhaseCursor, right: PhaseCursor): number {
   if (left.round !== right.round) {
     return left.round - right.round;
@@ -118,6 +148,15 @@ function latestCursor(bundle: ArtifactBundle): PhaseCursor {
 
 function latestMarker(markers: readonly ReplayMarker[]): ReplayMarker | null {
   return [...markers].sort((left, right) => compareCursor(left.cursor, right.cursor))[markers.length - 1] ?? null;
+}
+
+function latestReplaySnapshotAtOrBefore(
+  snapshots: readonly ReplaySnapshot[],
+  cursor: PhaseCursor,
+): ReplaySnapshot | null {
+  return snapshots
+    .filter((snapshot) => cursorAtOrBefore(snapshot.cursor, cursor))
+    .at(-1) ?? null;
 }
 
 function finalReplaySnapshot(bundle: ArtifactBundle): ReplaySnapshot | null {
@@ -276,6 +315,170 @@ function buildReplayProjection(bundle: ArtifactBundle): ControlRoomProjection['r
   };
 }
 
+function currentRoundDeltaByAgent(snapshots: readonly ReplaySnapshot[]): Record<string, number> {
+  const latestSnapshot = snapshots.at(-1);
+  if (!latestSnapshot) {
+    return {};
+  }
+
+  const round = latestSnapshot.cursor.round;
+  const firstSnapshotThisRound = snapshots.find((snapshot) => snapshot.cursor.round === round) ?? latestSnapshot;
+  const agentIds = new Set<string>([
+    ...Object.keys(firstSnapshotThisRound.state.scoreByAgent),
+    ...Object.keys(latestSnapshot.state.scoreByAgent),
+  ]);
+
+  return Object.fromEntries(
+    [...agentIds].map((agentId) => [
+      agentId,
+      (latestSnapshot.state.scoreByAgent[agentId] ?? 0) - (firstSnapshotThisRound.state.scoreByAgent[agentId] ?? 0),
+    ]),
+  );
+}
+
+function buildLiveCallsheet(
+  roster: readonly RosterEntry[],
+  reduced: AcpIngressReducerState,
+): CallsheetRow[] {
+  const latestState = reduced.snapshots.at(-1)?.state ?? reduced.matchState;
+  const roundDeltas = currentRoundDeltaByAgent(reduced.snapshots);
+  const structuredCommitments = reduced.matchState.structuredCommitments;
+
+  return roster.map((entry) => ({
+    agentId: entry.agentId,
+    displayName: entry.displayName,
+    seat: entry.seat,
+    role: entry.role,
+    modelBadge: `${entry.modelFamily}:${entry.modelVersion}`,
+    memoryEnabled: entry.memoryEnabled,
+    status: (latestState.eliminatedAgentIds.includes(entry.agentId) ? 'eliminated' : 'alive') as 'alive' | 'eliminated',
+    scoreTotal: latestState.scoreByAgent[entry.agentId] ?? 0,
+    latestRoundDelta: roundDeltas[entry.agentId] ?? 0,
+    commitmentCount: structuredCommitments
+      .filter((envelope) => envelope.agentId === entry.agentId)
+      .reduce((sum, envelope) => sum + envelope.commitments.length, 0),
+    privateArtifactCount: 0,
+    alertCount: 0,
+  })).sort((left, right) => left.seat - right.seat);
+}
+
+function buildLiveReplayProjection(reduced: AcpIngressReducerState): ControlRoomProjection['replay'] {
+  return {
+    timeline: reduced.replayBundle.timeline.map((cursor) => ({ ...cursor })),
+    snapshots: reduced.replayBundle.snapshots.map((snapshot) => ({
+      snapshotId: snapshot.snapshotId,
+      cursor: { ...snapshot.cursor },
+      capturedAt: snapshot.capturedAt,
+      aliveAgentIds: [...snapshot.state.aliveAgentIds],
+      eliminatedAgentIds: [...snapshot.state.eliminatedAgentIds],
+      openAwaitIds: [...snapshot.state.openAwaitIds],
+      scoreByAgent: { ...snapshot.state.scoreByAgent },
+    })),
+    markers: reduced.replayBundle.markers.map((marker) => ({
+      markerId: marker.markerId,
+      cursor: { ...marker.cursor },
+      markerType: marker.markerType,
+      label: marker.label,
+      sourceRecordIds: [...marker.sourceEventIds],
+      linkedAwaitId: marker.linkedAwaitId ?? null,
+    })),
+    snapshotCount: reduced.replayBundle.snapshots.length,
+    markerCount: reduced.replayBundle.markers.length,
+    markerIds: reduced.replayBundle.markers.map((marker) => marker.markerId),
+  };
+}
+
+function interventionQueueIdsAtCursor(
+  interventions: readonly InterventionRecord[],
+  openAwaitIds: readonly string[],
+  cursor: PhaseCursor,
+): string[] {
+  const latestByAwaitId = new Map<string, InterventionRecord>();
+  for (const intervention of interventions) {
+    if (!cursorAtOrBefore(intervention.cursor, cursor)) {
+      continue;
+    }
+
+    latestByAwaitId.set(intervention.awaitId, intervention);
+  }
+
+  return openAwaitIds.flatMap((awaitId) => {
+    const intervention = latestByAwaitId.get(awaitId);
+    return intervention ? [intervention.interventionId] : [];
+  });
+}
+
+function buildLiveLayeredSnapshots(reduced: AcpIngressReducerState): LayeredCursorSnapshot[] {
+  return reduced.replayBundle.timeline.map((cursor) => {
+    const snapshot = latestReplaySnapshotAtOrBefore(reduced.snapshots, cursor);
+    const openAwaitIds = snapshot?.state.openAwaitIds ?? [];
+    const interventionIds = interventionQueueIdsAtCursor(reduced.interventions, openAwaitIds, cursor);
+
+    return {
+      cursor,
+      publicStream: {
+        eventIds: recordsAtCursor(reduced.publicEvents, cursor).map((event) => event.eventId),
+        markerIds: recordsAtCursor(reduced.markers, cursor).map((marker) => marker.markerId),
+      },
+      privateState: {
+        artifactIds: [],
+        commitmentEnvelopeIds: reduced.matchState.structuredCommitments
+          .filter((envelope) => shouldIncludeCommitmentEnvelope(envelope, cursor))
+          .map((envelope) => envelope.envelopeId),
+      },
+      alerts: {
+        alertIds: [],
+        activeAlertIds: [],
+      },
+      interventionQueue: {
+        interventionIds,
+        pendingInterventionIds: [...interventionIds],
+        disabledPhaseOnePlaceholders: [...DISABLED_PHASE_ONE_INTERVENTIONS],
+      },
+    };
+  });
+}
+
+function buildLiveAwaitingQueue(reduced: AcpIngressReducerState): LiveAwaitingQueueItem[] {
+  const latestInterventionByAwaitId = new Map<string, InterventionRecord>();
+  for (const intervention of reduced.interventions) {
+    latestInterventionByAwaitId.set(intervention.awaitId, intervention);
+  }
+
+  return reduced.awaitRecords
+    .filter((record) => reduced.matchState.openAwaitIds.includes(record.awaitId))
+    .map((record) => ({
+      awaitId: record.awaitId,
+      kind: record.kind,
+      prompt: record.prompt,
+      status: record.status,
+      openedAt: record.openedAt,
+      openedBy: record.openedBy,
+      choiceIds: record.choices.map((choice) => choice.choiceId),
+      latestInterventionId: latestInterventionByAwaitId.get(record.awaitId)?.interventionId ?? null,
+    }));
+}
+
+function buildLiveHomeSummary(
+  manifest: RunManifest,
+  reduced: AcpIngressReducerState,
+): ControlRoomHomeSummary {
+  const marker = latestMarker(reduced.markers);
+
+  return {
+    runId: manifest.runId,
+    matchId: manifest.matchId,
+    condition: manifest.condition,
+    currentCursor: { ...reduced.matchState.current },
+    survivingAgentCount: reduced.matchState.aliveAgentIds.length,
+    eliminatedAgentCount: reduced.matchState.eliminatedAgentIds.length,
+    activeAlertCount: 0,
+    openAwaitCount: reduced.matchState.openAwaitIds.length,
+    latestMarkerId: marker?.markerId ?? null,
+    latestMarkerLabel: marker?.label ?? null,
+  };
+}
+
 export function createControlRoomProjection(bundle: ArtifactBundle): ControlRoomProjection {
   return {
     manifest: bundle.manifest,
@@ -285,5 +488,30 @@ export function createControlRoomProjection(bundle: ArtifactBundle): ControlRoom
     layeredSnapshots: buildLayeredSnapshots(bundle),
     replay: buildReplayProjection(bundle),
     aftermath: createAftermathReport(bundle),
+  };
+}
+
+export interface LiveControlRoomProjectionInput {
+  manifest: RunManifest;
+  roster: readonly RosterEntry[];
+  reduced: AcpIngressReducerState;
+}
+
+export function createLiveControlRoomProjection(
+  input: LiveControlRoomProjectionInput,
+): LiveControlRoomProjection {
+  return {
+    manifest: input.manifest,
+    home: buildLiveHomeSummary(input.manifest, input.reduced),
+    callsheet: buildLiveCallsheet(input.roster, input.reduced),
+    layeredSnapshots: buildLiveLayeredSnapshots(input.reduced),
+    replay: buildLiveReplayProjection(input.reduced),
+    live: {
+      matchStatus: input.reduced.matchState.status,
+      openAwaitIds: [...input.reduced.matchState.openAwaitIds],
+      awaitingQueue: buildLiveAwaitingQueue(input.reduced),
+      publicEventCount: input.reduced.publicEvents.length,
+      interventionCount: input.reduced.interventions.length,
+    },
   };
 }
