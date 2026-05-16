@@ -1,0 +1,219 @@
+import SwiftUI
+
+/// State-driven motion system for the control room.
+///
+/// Every primitive here animates off a value derived from the **canonical
+/// projection / `PresentationState`** — never a decorative free-running timer
+/// and never `Double.random`. Animations fire through `.animation(_, value:)`
+/// on a state-derived value or a `transition` on an identity change. The one
+/// repeating element (`eventPulse`) is gated on canonical state
+/// (`activeAlertCount > 0`) and its strength is derived from the pressure band:
+/// a state-conditioned heartbeat, not ambient decoration. A quiet room with no
+/// active alerts produces no pulse at all.
+///
+/// `GameMotion` is the single source of timing truth so every surface shares
+/// one animation vocabulary and the product feels like one game.
+
+// MARK: - Shared vocabulary
+
+enum GameMotion {
+    /// Spotlight handoff between focal beats / selected cast.
+    static let spotlightHandoff: TimeInterval = 0.45
+    /// Pressure-shell rings contracting as the band tightens.
+    static let shellContraction: TimeInterval = 0.7
+    /// One beat of the alert heartbeat.
+    static let eventPulse: TimeInterval = 1.1
+    /// A single betrayal accent flash.
+    static let betrayalFlash: TimeInterval = 0.35
+    /// Replay scrub slide between beats / ladder rows.
+    static let replayScrub: TimeInterval = 0.4
+    /// Per-index delay added to each aftermath story beat reveal.
+    static let aftermathStaggerStep: TimeInterval = 0.12
+    /// Upper bound on the staggered reveal so long timelines stay snappy.
+    static let aftermathStaggerCap: TimeInterval = 0.96
+
+    static var spotlightHandoffAnimation: Animation {
+        .spring(response: spotlightHandoff, dampingFraction: 0.82)
+    }
+
+    static var shellContractionAnimation: Animation {
+        .easeInOut(duration: shellContraction)
+    }
+
+    static var betrayalFlashAnimation: Animation {
+        .easeOut(duration: betrayalFlash)
+    }
+
+    static var replayScrubAnimation: Animation {
+        .spring(response: replayScrub, dampingFraction: 0.78)
+    }
+
+    /// Pulse repeats only while the modifier stays mounted, which callers gate
+    /// on canonical state — it is not a standalone clock.
+    static var eventPulseAnimation: Animation {
+        .easeInOut(duration: eventPulse).repeatForever(autoreverses: true)
+    }
+
+    static func aftermathStaggerAnimation(forIndex index: Int) -> Animation {
+        .easeOut(duration: spotlightHandoff).delay(AftermathSequence.delay(forIndex: index))
+    }
+}
+
+// MARK: - Canonical pressure band
+
+/// Typed view of the projection's pressure band label so motion intensity is
+/// derived from canonical match state rather than ad-hoc string checks.
+enum PressureBand: String, CaseIterable {
+    case open = "Open"
+    case tightening = "Tightening"
+    case pressurized = "Pressurized"
+    case knifeEdge = "Knife-edge"
+
+    init(label: String) {
+        self = PressureBand(rawValue: label) ?? .open
+    }
+}
+
+// MARK: - Pure motion parameters (unit-tested)
+
+enum ShellContraction {
+    /// 0 = open shell at full radius, 1 = fully collapsed. Monotonic in band.
+    static func intensity(forBand band: PressureBand) -> Double {
+        switch band {
+        case .open: 0.0
+        case .tightening: 0.4
+        case .pressurized: 0.7
+        case .knifeEdge: 1.0
+        }
+    }
+}
+
+enum AftermathSequence {
+    /// Reveal delay for the story beat at `index`, clamped to the cap so a long
+    /// timeline does not crawl in.
+    static func delay(forIndex index: Int) -> TimeInterval {
+        let raw = Double(max(0, index)) * GameMotion.aftermathStaggerStep
+        return min(raw, GameMotion.aftermathStaggerCap)
+    }
+}
+
+enum ScrubDirection {
+    case forward
+    case backward
+    case none
+
+    /// Direction of a replay scrub, taken from the sign of the focus-index
+    /// delta — canonical `PresentationState` movement, not a guess.
+    static func between(previousIndex: Int, currentIndex: Int) -> ScrubDirection {
+        if currentIndex > previousIndex {
+            .forward
+        } else if currentIndex < previousIndex {
+            .backward
+        } else {
+            .none
+        }
+    }
+}
+
+enum BetrayalFlash {
+    private static let triggerStems = ["betray", "diverg", "reveal", "elimination", "deadlock"]
+
+    /// True only for betrayal-class replay marker types. The flash fires when a
+    /// betrayal beat takes focus — derived from the marker, not a timer.
+    static func isTriggered(byMarkerType markerType: String) -> Bool {
+        let lowered = markerType.lowercased()
+        return triggerStems.contains { lowered.contains($0) }
+    }
+}
+
+enum EventPulse {
+    /// The pulse exists only when canonical state reports a live alert.
+    static func isActive(activeAlertCount: Int) -> Bool {
+        activeAlertCount > 0
+    }
+
+    /// Pulse amplitude scales with how tight the room is.
+    static func strength(forBand band: PressureBand) -> Double {
+        switch band {
+        case .open: 0.25
+        case .tightening: 0.5
+        case .pressurized: 0.75
+        case .knifeEdge: 1.0
+        }
+    }
+}
+
+// MARK: - SwiftUI primitives
+
+extension View {
+    /// Animate this view as a spotlight when `id` (a canonical identity such as
+    /// the focused marker id or selected cast id) changes.
+    func spotlightHandoff<ID: Equatable>(id: ID) -> some View {
+        animation(GameMotion.spotlightHandoffAnimation, value: id)
+            .transition(.asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.97)),
+                removal: .opacity
+            ))
+    }
+
+    /// Slide + fade as a replay scrub. Direction is the sign of the focus-index
+    /// delta, so forward and backward scrubs read differently.
+    func replayScrub(direction: ScrubDirection, value: some Equatable) -> some View {
+        let edge: Edge = direction == .backward ? .leading : .trailing
+        return transition(.asymmetric(
+            insertion: .move(edge: edge).combined(with: .opacity),
+            removal: .opacity
+        ))
+        .animation(GameMotion.replayScrubAnimation, value: value)
+    }
+
+    /// One-shot accent flash when a betrayal-class beat takes focus.
+    func betrayalFlash(active: Bool) -> some View {
+        modifier(BetrayalFlashModifier(active: active))
+    }
+
+    /// State-gated alert heartbeat. With `active == false` the view is
+    /// completely still — no pulse for a quiet room.
+    func eventPulse(active: Bool, strength: Double) -> some View {
+        modifier(EventPulseModifier(active: active, strength: strength))
+    }
+
+    /// Reveal as part of a staggered aftermath sequence, ordered by `index`.
+    /// `appeared` is a one-shot flag flipped on view appear — not a loop.
+    func aftermathSequenced(index: Int, appeared: Bool) -> some View {
+        opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 14)
+            .animation(GameMotion.aftermathStaggerAnimation(forIndex: index), value: appeared)
+    }
+}
+
+private struct BetrayalFlashModifier: ViewModifier {
+    let active: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.red, lineWidth: active ? 3 : 0)
+                    .opacity(active ? 0.85 : 0)
+            }
+            .animation(GameMotion.betrayalFlashAnimation, value: active)
+    }
+}
+
+private struct EventPulseModifier: ViewModifier {
+    let active: Bool
+    let strength: Double
+
+    @State private var pulsed = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(active && pulsed ? 1 + 0.04 * strength : 1)
+            .opacity(active && pulsed ? 1 : (active ? 0.85 : 1))
+            .animation(active ? GameMotion.eventPulseAnimation : .default, value: pulsed)
+            .onChange(of: active, initial: true) { _, isActive in
+                pulsed = isActive
+            }
+    }
+}

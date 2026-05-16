@@ -153,6 +153,82 @@ struct PresentationStateTests {
     }
 }
 
+struct MotionSystemTests {
+    @Test("Every motion vocabulary duration is positive")
+    func vocabularyDurationsArePositive() {
+        #expect(GameMotion.spotlightHandoff > 0)
+        #expect(GameMotion.shellContraction > 0)
+        #expect(GameMotion.eventPulse > 0)
+        #expect(GameMotion.betrayalFlash > 0)
+        #expect(GameMotion.replayScrub > 0)
+        #expect(GameMotion.aftermathStaggerStep > 0)
+        #expect(GameMotion.aftermathStaggerCap >= GameMotion.aftermathStaggerStep)
+    }
+
+    @Test("Pressure band parses known labels and falls back to open")
+    func pressureBandParsing() {
+        #expect(PressureBand(label: "Open") == .open)
+        #expect(PressureBand(label: "Tightening") == .tightening)
+        #expect(PressureBand(label: "Pressurized") == .pressurized)
+        #expect(PressureBand(label: "Knife-edge") == .knifeEdge)
+        #expect(PressureBand(label: "nonsense") == .open)
+    }
+
+    @Test("Shell contraction intensity rises monotonically with pressure band")
+    func shellContractionIntensityMonotonic() {
+        let open = ShellContraction.intensity(forBand: .open)
+        let tightening = ShellContraction.intensity(forBand: .tightening)
+        let pressurized = ShellContraction.intensity(forBand: .pressurized)
+        let knifeEdge = ShellContraction.intensity(forBand: .knifeEdge)
+
+        #expect(open == 0.0)
+        #expect(knifeEdge == 1.0)
+        #expect(open < tightening)
+        #expect(tightening < pressurized)
+        #expect(pressurized < knifeEdge)
+    }
+
+    @Test("Aftermath sequencing delay grows per index and caps")
+    func aftermathSequenceDelay() {
+        #expect(AftermathSequence.delay(forIndex: 0) == 0)
+        #expect(AftermathSequence.delay(forIndex: 1) == GameMotion.aftermathStaggerStep)
+        #expect(AftermathSequence.delay(forIndex: 2) == GameMotion.aftermathStaggerStep * 2)
+        #expect(AftermathSequence.delay(forIndex: 9999) == GameMotion.aftermathStaggerCap)
+        #expect(AftermathSequence.delay(forIndex: -3) == 0)
+    }
+
+    @Test("Scrub direction derives from focus-index delta sign")
+    func scrubDirectionFromDelta() {
+        #expect(ScrubDirection.between(previousIndex: 1, currentIndex: 2) == .forward)
+        #expect(ScrubDirection.between(previousIndex: 4, currentIndex: 1) == .backward)
+        #expect(ScrubDirection.between(previousIndex: 3, currentIndex: 3) == .none)
+    }
+
+    @Test("Betrayal flash triggers only on betrayal-class marker types")
+    func betrayalFlashTriggering() {
+        #expect(BetrayalFlash.isTriggered(byMarkerType: "betrayal_exposed"))
+        #expect(BetrayalFlash.isTriggered(byMarkerType: "commitment_divergence"))
+        #expect(BetrayalFlash.isTriggered(byMarkerType: "private_reveal"))
+        #expect(BetrayalFlash.isTriggered(byMarkerType: "elimination"))
+        #expect(BetrayalFlash.isTriggered(byMarkerType: "DEADLOCK"))
+        #expect(BetrayalFlash.isTriggered(byMarkerType: "round_scores_posted") == false)
+        #expect(BetrayalFlash.isTriggered(byMarkerType: "phase_advance") == false)
+    }
+
+    @Test("Event pulse is gated on active alerts and strengthens with the band")
+    func eventPulseGatingAndStrength() {
+        #expect(EventPulse.isActive(activeAlertCount: 0) == false)
+        #expect(EventPulse.isActive(activeAlertCount: 1))
+        #expect(EventPulse.isActive(activeAlertCount: 9))
+
+        let open = EventPulse.strength(forBand: .open)
+        let knifeEdge = EventPulse.strength(forBand: .knifeEdge)
+        #expect(open > 0)
+        #expect(open < knifeEdge)
+        #expect(knifeEdge == 1.0)
+    }
+}
+
 private let controlProjectionJSON = #"""
 {
   "manifest": {
