@@ -323,6 +323,16 @@ struct TensionGaugeTests {
             #expect(pct >= 0 && pct <= 100)
         }
     }
+
+    @Test("Tension percent preserves the legacy mapping", arguments: [
+        (PressureBand.open, 24),
+        (.tightening, 48),
+        (.pressurized, 72),
+        (.knifeEdge, 87),
+    ])
+    func legacyMapping(band: PressureBand, expected: Int) {
+        #expect(TensionGauge.percent(forBand: band) == expected)
+    }
 }
 
 private let controlProjectionJSON = #"""

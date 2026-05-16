@@ -196,8 +196,11 @@ enum PressureBandSelection {
 }
 
 enum TensionGauge {
-    /// Tension readout (0...100) for the pressure band. Strictly increasing in
-    /// band severity so the gauge always reads hotter as the room tightens.
+    /// Tension readout for the pressure band. Strictly increasing in band
+    /// severity so the gauge always reads hotter as the room tightens. Values
+    /// (24/48/72/87) preserve the legacy `tensionPercent` mapping verbatim;
+    /// `knifeEdge` stops at 87 by design, leaving headroom rather than pinning
+    /// the gauge to 100.
     static func percent(forBand band: PressureBand) -> Int {
         switch band {
         case .open: 24
