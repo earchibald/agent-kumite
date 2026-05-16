@@ -223,6 +223,16 @@ extension View {
             .offset(y: appeared ? 0 : 14)
             .animation(GameMotion.aftermathStaggerAnimation(forIndex: index), value: appeared)
     }
+
+    /// Stage a cast member walking onto the Arena, ordered by `index`. `entered`
+    /// is a one-shot flag flipped on scene appear — a deliberate lineup, not a
+    /// loop and not a timer.
+    func castEntrance(index: Int, entered: Bool) -> some View {
+        opacity(entered ? 1 : 0)
+            .scaleEffect(entered ? 1 : 0.92)
+            .offset(y: entered ? 0 : 18)
+            .animation(GameMotion.castEntranceAnimation(forIndex: index), value: entered)
+    }
 }
 
 private struct BetrayalFlashModifier: ViewModifier {

@@ -105,8 +105,6 @@ private struct PrimaryContentView: View {
             switch model.selectedScreen {
             case .arena:
                 ArenaView(projection: projection, model: model)
-            case .home:
-                HomeDashboardView(projection: projection, onInspect: model.inspect)
             case .callsheet:
                 CallsheetView(projection: projection, onInspect: model.inspect)
             case .liveOps:

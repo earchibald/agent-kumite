@@ -43,6 +43,17 @@ struct AgentKumiteControlRoomTests {
     }
 }
 
+struct ControlRoomScreenTests {
+    @Test("Arena is the first screen and the static Home screen is gone")
+    func arenaReplacesHome() {
+        let screens = ControlRoomScreen.allCases
+        #expect(screens.first == .arena)
+        #expect(screens.contains { $0.rawValue == "home" } == false)
+        #expect(screens.contains(.callsheet))
+        #expect(screens.count == 5)
+    }
+}
+
 struct PresentationStateTests {
     @Test("Empty beat list has no focus and cannot play")
     func emptyHasNoFocus() {
