@@ -1,5 +1,7 @@
 import SwiftUI
 
+// MARK: - Arena composites
+
 /// The pressure shell promoted to the centerpiece. Rings contract on the
 /// canonical band and the cast walks on in a staged lineup.
 struct CenterStageShell: View {
@@ -216,6 +218,8 @@ struct ArenaTransportBar: View {
     }
 }
 
+// MARK: - Shared section scaffolding
+
 struct MissionHeroHeader: View {
     let eyebrow: String
     let title: String
@@ -336,6 +340,8 @@ struct MetricCardView: View {
     }
 }
 
+// MARK: - Shared leaf views
+
 struct TagPillView: View {
     let text: String
     let color: Color
@@ -384,6 +390,8 @@ struct ControlRoomBackdrop: View {
         .ignoresSafeArea()
     }
 }
+
+// MARK: - Pressure shell visual
 
 struct PressureShellVisualView: View {
     let rows: [CallsheetRow]
@@ -454,9 +462,13 @@ struct PressureShellVisualView: View {
     }
 }
 
-/// One labeled capsule in a marquee pill row.
+// MARK: - Marquee grammar
+
+/// One labeled capsule in a marquee pill row. `id` is the pill text: stable
+/// across renders so pill-set changes can animate by identity. Pill texts are
+/// distinct within a single marquee row.
 struct MarqueePill: Identifiable {
-    let id = UUID()
+    var id: String { text }
     let text: String
     let color: Color
 }
