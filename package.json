@@ -5,6 +5,9 @@
   "scripts": {
     "test": "vitest run",
     "build": "tsc -p tsconfig.json",
+    "gui:build": "swift build --package-path apps/control-room",
+    "gui:test": "swift test --package-path apps/control-room",
+    "gui:run": "swift run --package-path apps/control-room AgentKumiteControlRoom",
     "simulate": "node dist/cli.js",
     "report": "node dist/report-cli.js",
     "live-export-acp": "node dist/runtime-acp-ingress-cli.js",

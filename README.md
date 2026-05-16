@@ -19,6 +19,7 @@ This repo lets you:
 - query and inspect the live-ingestion daemon through reusable client helpers and a CLI
 - mirror daemon-backed live store/projection snapshots to local files with a follow CLI
 - generate replay-lab helper outputs such as marker jumps and snapshot diffs
+- launch a macOS SwiftUI control-room shell over `control-room.json` or `live-control-room.json`
 
 The current implementation is local and fixture-driven. It is the artifact / benchmark / operator-view pipeline underneath the future ACP-backed live surfaces.
 
@@ -196,6 +197,34 @@ Use this when you want the live-path adapter surface:
 - canonical ACP ingress reduced through the live run store
 - live home / callsheet / layered snapshot / replay JSON
 - no fabricated benchmark summary or aftermath fields
+
+### 6. Launch the macOS control-room GUI
+
+The repo now includes a standalone SwiftUI package at `apps/control-room` that renders the five-screen control-room shell over the same JSON projections the CLI emits.
+
+Build the GUI package once:
+
+```bash
+npm run gui:build
+```
+
+If you want fresh demo projections to inspect in the app:
+
+```bash
+npm run bundle -- --input fixtures/demo-match.input.json --output-dir out/gui/demo --pretty
+npm run project -- --input out/gui/demo/artifact-bundle.json --output out/gui/demo/control-room.json --pretty
+npm run live-project -- --manifest fixtures/run-manifest.live.c5.json --roster fixtures/roster.demo.json --ingress fixtures/acp-ingress.sequence.c5.json --output out/gui/demo/live-control-room.json --pretty
+```
+
+Then launch the GUI against either projection:
+
+```bash
+npm run gui:run -- --projection out/gui/demo/control-room.json
+# or
+npm run gui:run -- --projection out/gui/demo/live-control-room.json
+```
+
+The first slice is intentionally read-only: it lets you inspect home, callsheet, live-ops, replay, and aftermath views over canonical projection data without bypassing the existing runtime pipeline.
 
 If you already have a persisted live store, you can project from that directly:
 
