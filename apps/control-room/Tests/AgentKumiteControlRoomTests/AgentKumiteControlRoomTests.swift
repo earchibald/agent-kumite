@@ -335,6 +335,64 @@ struct TensionGaugeTests {
     }
 }
 
+struct ArenaModeTests {
+    @Test("Eyebrow prefix per mode keeps Arena reading LIVE", arguments: [
+        (ArenaMode.operating, "LIVE · C4"),
+        (.live, "LIVE OPS · C4"),
+        (.recap, "RECAP · C4"),
+    ])
+    func eyebrow(mode: ArenaMode, expected: String) {
+        #expect(MarqueePresentation.eyebrow(mode: mode, condition: "c4") == expected)
+    }
+
+    @Test("Recap hides the live beat counter and survivor pill")
+    func recapHidesLiveChrome() {
+        #expect(MarqueePresentation.showsBeatCounter(mode: .recap) == false)
+        #expect(MarqueePresentation.showsSurvivorPill(mode: .recap) == false)
+    }
+
+    @Test("Live and operating keep live chrome", arguments: [ArenaMode.live, .operating])
+    func liveKeepsChrome(mode: ArenaMode) {
+        #expect(MarqueePresentation.showsBeatCounter(mode: mode))
+        #expect(MarqueePresentation.showsSurvivorPill(mode: mode))
+    }
+
+    @Test("Mode selection: live projection with an open match runs live")
+    func selectionLive() {
+        #expect(ArenaModeSelection.mode(forKind: .live, matchStatus: "live") == .live)
+    }
+
+    @Test("Mode selection: control projection and unknown/closed status run recap", arguments: [
+        (ProjectionKind.control, String?.none),
+        (.control, "closed"),
+        (.live, "closed"),
+        (.live, String?.none),
+    ])
+    func selectionRecap(kind: ProjectionKind, status: String?) {
+        #expect(ArenaModeSelection.mode(forKind: kind, matchStatus: status) == .recap)
+    }
+}
+
+struct SpotlightSnapshotSelectionTests {
+    @Test("Empty list has no spotlight")
+    func empty() {
+        #expect(SpotlightSnapshotSelection.index(count: 0, selected: nil) == nil)
+        #expect(SpotlightSnapshotSelection.index(count: 0, selected: 3) == nil)
+    }
+
+    @Test("No selection spotlights the latest snapshot")
+    func latest() {
+        #expect(SpotlightSnapshotSelection.index(count: 5, selected: nil) == 4)
+    }
+
+    @Test("Selection passes through and clamps", arguments: [
+        (2, 2), (0, 0), (-3, 0), (9, 4),
+    ])
+    func clamps(selected: Int, expected: Int) {
+        #expect(SpotlightSnapshotSelection.index(count: 5, selected: selected) == expected)
+    }
+}
+
 private let controlProjectionJSON = #"""
 {
   "manifest": {

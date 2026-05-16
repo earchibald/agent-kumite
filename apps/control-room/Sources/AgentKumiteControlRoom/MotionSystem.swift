@@ -211,6 +211,71 @@ enum TensionGauge {
     }
 }
 
+// MARK: - Arena mode (unit-tested)
+
+/// Which stance a screen takes on the same projection. The grammar is shared;
+/// the mode only changes labeling and which live-only chrome shows — never the
+/// layout branching inside a component.
+enum ArenaMode: String, CaseIterable {
+    /// `ArenaView` — staged spectator broadcast of a live match.
+    case operating
+    /// `LiveOpsView` — operating the same live match.
+    case live
+    /// `ReplayLabView` — after-the-fact recap and proof.
+    case recap
+}
+
+enum MarqueePresentation {
+    /// Marquee eyebrow, e.g. `LIVE · C4`. `operating` stays "LIVE" so the Arena
+    /// header is unchanged from AK-63; `live` is the operator stance; `recap`
+    /// is past-tense.
+    static func eyebrow(mode: ArenaMode, condition: String) -> String {
+        let prefix: String
+        switch mode {
+        case .operating: prefix = "LIVE"
+        case .live: prefix = "LIVE OPS"
+        case .recap: prefix = "RECAP"
+        }
+        return "\(prefix) · \(condition.uppercased())"
+    }
+
+    /// The live "Beat n / N" counter only makes sense while a match clock is
+    /// running — recap is scrubbed, not tracked.
+    static func showsBeatCounter(mode: ArenaMode) -> Bool {
+        mode != .recap
+    }
+
+    /// "X still in" survivor pill is live-only.
+    static func showsSurvivorPill(mode: ArenaMode) -> Bool {
+        mode != .recap
+    }
+}
+
+enum ArenaModeSelection {
+    /// The mode a non-Arena screen runs in. A live projection whose match is
+    /// still open is `.live`; everything else (benchmark/control, or a live
+    /// projection whose match has closed) is `.recap`. `ArenaView` always
+    /// passes `.operating` explicitly and does not use this.
+    static func mode(forKind kind: ProjectionKind, matchStatus: String?) -> ArenaMode {
+        if kind == .live, matchStatus?.lowercased() == "live" {
+            return .live
+        }
+        return .recap
+    }
+}
+
+enum SpotlightSnapshotSelection {
+    /// Index of the snapshot to promote into the spotlight proof card. Falls
+    /// back to the latest (last) snapshot when nothing is selected; clamps
+    /// out-of-range selections; `nil` for an empty list. Mirrors
+    /// `EventTickerWindow`/`PresentationState` clamp semantics.
+    static func index(count: Int, selected: Int?) -> Int? {
+        guard count > 0 else { return nil }
+        guard let selected else { return count - 1 }
+        return min(max(0, selected), count - 1)
+    }
+}
+
 // MARK: - SwiftUI primitives
 
 extension View {
