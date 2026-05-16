@@ -16,6 +16,12 @@ struct ReplayLabView: View {
     private var markers: [ReplayMarker] { projection.replay.markers }
     private var snapshots: [ReplaySnapshot] { projection.replay.snapshots }
 
+    private func resetScrubState() {
+        focusIndex = 0
+        snapshotSelection = nil
+        scrubDirection = .none
+    }
+
     private var spotlightSnapshot: ReplaySnapshot? {
         SpotlightSnapshotSelection
             .index(count: snapshots.count, selected: snapshotSelection)
@@ -39,11 +45,7 @@ struct ReplayLabView: View {
                 description: Text("This projection has no replay markers or snapshots yet. The recap reel fills in once the match produces beats.")
             )
             .background(ControlRoomBackdrop())
-            .onChange(of: projection.manifest.runId) { _, _ in
-                focusIndex = 0
-                snapshotSelection = nil
-                scrubDirection = .none
-            }
+            .onChange(of: projection.manifest.runId) { _, _ in resetScrubState() }
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -104,11 +106,7 @@ struct ReplayLabView: View {
             }
             .background(ControlRoomBackdrop())
             .onAppear { reelEntered = true }
-            .onChange(of: projection.manifest.runId) { _, _ in
-                focusIndex = 0
-                snapshotSelection = nil
-                scrubDirection = .none
-            }
+            .onChange(of: projection.manifest.runId) { _, _ in resetScrubState() }
         }
     }
 }
