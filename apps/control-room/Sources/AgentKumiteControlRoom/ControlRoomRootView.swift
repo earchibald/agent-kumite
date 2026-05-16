@@ -103,6 +103,8 @@ private struct PrimaryContentView: View {
     var body: some View {
         if let projection = model.loadedProjection {
             switch model.selectedScreen {
+            case .arena:
+                ArenaView(projection: projection, model: model)
             case .home:
                 HomeDashboardView(projection: projection, onInspect: model.inspect)
             case .callsheet:

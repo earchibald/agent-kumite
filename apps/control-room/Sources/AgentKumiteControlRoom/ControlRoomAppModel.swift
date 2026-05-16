@@ -4,12 +4,13 @@ import Observation
 @MainActor
 @Observable
 final class ControlRoomAppModel {
-    var selectedScreen: ControlRoomScreen = .home
+    var selectedScreen: ControlRoomScreen = .arena
     var selectedInspector: InspectorItem?
     var loadedProjection: LoadedProjection?
     var loadedFileURL: URL?
     var errorMessage: String?
     var isImporterPresented = false
+    var presentation = PresentationState(beatCount: 0)
 
     private let launchProjectionURL: URL?
     private var attemptedLaunchLoad = false
@@ -32,6 +33,33 @@ final class ControlRoomAppModel {
 
     func inspect(_ item: InspectorItem?) {
         selectedInspector = item
+    }
+
+    // Transport — the Arena routes attention to one focal beat at a time.
+    // PresentationState mutation stays funneled through the model so it
+    // remains the single owner of the presentation clock.
+    func focusNextBeat() {
+        presentation.stepForward()
+    }
+
+    func focusPreviousBeat() {
+        presentation.stepBackward()
+    }
+
+    func togglePlayback() {
+        if presentation.isPlaying {
+            presentation.pause()
+        } else {
+            presentation.play()
+        }
+    }
+
+    func focusBeat(at index: Int) {
+        presentation.jump(to: index)
+    }
+
+    func resetPresentation() {
+        presentation.reset()
     }
 
     func loadLaunchProjectionIfNeeded() {
@@ -79,6 +107,7 @@ final class ControlRoomAppModel {
             loadedFileURL = url
             errorMessage = nil
             selectedInspector = nil
+            presentation.rebind(beatCount: loadedProjection.replay.markers.count)
 
             if loadedProjection.aftermath == nil, selectedScreen == .aftermathLedger {
                 selectedScreen = .liveOps

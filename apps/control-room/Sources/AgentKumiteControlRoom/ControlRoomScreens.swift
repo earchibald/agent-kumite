@@ -1,5 +1,147 @@
 import SwiftUI
 
+struct ArenaView: View {
+    let projection: LoadedProjection
+    @Bindable var model: ControlRoomAppModel
+
+    private var markers: [ReplayMarker] {
+        projection.replay.markers
+    }
+
+    var body: some View {
+        if model.presentation.hasFocus, model.presentation.focusIndex < markers.count {
+            let marker = markers[model.presentation.focusIndex]
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    MissionHeroHeader(
+                        eyebrow: "Arena · \(projection.pressurePresentation.band)",
+                        title: marker.label,
+                        subtitle: "One focal beat at a time. \(projection.pressurePresentation.headline)"
+                    )
+
+                    FocalBeatCard(marker: marker, projection: projection) {
+                        model.inspect(.marker(marker))
+                    }
+
+                    TransportBar(model: model)
+
+                    Text("Beat \(model.presentation.focusIndex + 1) of \(markers.count) · \(marker.markerType.replacingOccurrences(of: "_", with: " "))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(28)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(ControlRoomBackdrop())
+            .task(id: model.presentation.isPlaying) {
+                guard model.presentation.isPlaying else { return }
+                while model.presentation.isPlaying, model.presentation.isAtEnd == false {
+                    try? await Task.sleep(for: .seconds(4))
+                    if Task.isCancelled { return }
+                    model.focusNextBeat()
+                }
+            }
+        } else {
+            ContentUnavailableView(
+                "Arena Idle",
+                systemImage: "sportscourt",
+                description: Text("This projection has no replay beats yet. The Arena focuses one beat at a time once markers exist.")
+            )
+            .background(ControlRoomBackdrop())
+        }
+    }
+}
+
+private struct FocalBeatCard: View {
+    let marker: ReplayMarker
+    let projection: LoadedProjection
+    let onInspect: () -> Void
+
+    var body: some View {
+        Button(action: onInspect) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkle.magnifyingglass")
+                        .font(.title2)
+                        .foregroundStyle(projection.pressurePresentation.color)
+                    Text(marker.markerType.replacingOccurrences(of: "_", with: " ").capitalized)
+                        .font(.headline)
+                    Spacer()
+                    TagPillView(text: marker.cursor.label, color: projection.pressurePresentation.color)
+                }
+
+                Text(marker.label)
+                    .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let linkedAwaitId = marker.linkedAwaitId {
+                    Text("Linked await · \(linkedAwaitId)")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("\(marker.sourceRecordIds.count) source record\(marker.sourceRecordIds.count == 1 ? "" : "s") · tap to inspect the proof")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(26)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(projection.pressurePresentation.color.opacity(0.14))
+            .clipShape(.rect(cornerRadius: 20))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct TransportBar: View {
+    @Bindable var model: ControlRoomAppModel
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Button {
+                model.focusPreviousBeat()
+            } label: {
+                Image(systemName: "backward.end.fill")
+            }
+            .disabled(model.presentation.focusIndex == 0)
+
+            Button {
+                model.togglePlayback()
+            } label: {
+                Image(systemName: model.presentation.isPlaying ? "pause.fill" : "play.fill")
+                    .frame(width: 26)
+            }
+            .disabled(model.presentation.isAtEnd && model.presentation.isPlaying == false)
+
+            Button {
+                model.focusNextBeat()
+            } label: {
+                Image(systemName: "forward.end.fill")
+            }
+            .disabled(model.presentation.isAtEnd)
+
+            Divider()
+                .frame(height: 22)
+
+            Button("Restart") {
+                model.resetPresentation()
+            }
+
+            Spacer()
+
+            Text(model.presentation.isPlaying ? "Playing" : "Paused")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .font(.title3)
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial)
+        .clipShape(.rect(cornerRadius: 16))
+    }
+}
+
 struct HomeDashboardView: View {
     let projection: LoadedProjection
     let onInspect: (InspectorItem?) -> Void
