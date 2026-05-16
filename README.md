@@ -211,9 +211,7 @@ npm run gui:build
 If you want fresh demo projections to inspect in the app:
 
 ```bash
-npm run bundle -- --input fixtures/demo-match.input.json --output-dir out/gui/demo --pretty
-npm run project -- --input out/gui/demo/artifact-bundle.json --output out/gui/demo/control-room.json --pretty
-npm run live-project -- --manifest fixtures/run-manifest.live.c5.json --roster fixtures/roster.demo.json --ingress fixtures/acp-ingress.sequence.c5.json --output out/gui/demo/live-control-room.json --pretty
+npm run gui:prepare-demo
 ```
 
 Then launch the GUI against either projection:
@@ -222,6 +220,14 @@ Then launch the GUI against either projection:
 npm run gui:run -- --projection out/gui/demo/control-room.json
 # or
 npm run gui:run -- --projection out/gui/demo/live-control-room.json
+```
+
+Or do both steps in one command:
+
+```bash
+npm run gui:demo
+# or
+npm run gui:demo:live
 ```
 
 The first slice is intentionally read-only: it lets you inspect home, callsheet, live-ops, replay, and aftermath views over canonical projection data without bypassing the existing runtime pipeline.
