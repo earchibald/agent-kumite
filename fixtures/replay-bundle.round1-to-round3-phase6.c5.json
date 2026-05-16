@@ -1,0 +1,106 @@
+{
+  "runId": "run_c5_seed_0001",
+  "timeline": [
+    { "round": 1, "phase": "cast_intro" },
+    { "round": 1, "phase": "private_negotiation" },
+    { "round": 1, "phase": "structured_commitment_submission" },
+    { "round": 1, "phase": "public_square" },
+    { "round": 1, "phase": "task_submission" },
+    { "round": 1, "phase": "simultaneous_reveal" },
+    { "round": 1, "phase": "resolution_pressure_escalation" },
+    { "round": 1, "phase": "elimination_aftermath" },
+    { "round": 1, "phase": "task_scoring_debrief" },
+    { "round": 2, "phase": "cast_intro" },
+    { "round": 2, "phase": "private_negotiation" },
+    { "round": 2, "phase": "structured_commitment_submission" },
+    { "round": 2, "phase": "public_square" },
+    { "round": 2, "phase": "task_submission" },
+    { "round": 2, "phase": "simultaneous_reveal" },
+    { "round": 2, "phase": "resolution_pressure_escalation" },
+    { "round": 2, "phase": "elimination_aftermath" },
+    { "round": 2, "phase": "task_scoring_debrief" },
+    { "round": 3, "phase": "cast_intro" },
+    { "round": 3, "phase": "private_negotiation" },
+    { "round": 3, "phase": "structured_commitment_submission" },
+    { "round": 3, "phase": "public_square" },
+    { "round": 3, "phase": "task_submission" },
+    { "round": 3, "phase": "simultaneous_reveal" }
+  ],
+  "snapshots": [
+    {
+      "snapshotId": "snapshot_round1_close",
+      "runId": "run_c5_seed_0001",
+      "cursor": { "round": 1, "phase": "task_scoring_debrief" },
+      "capturedAt": "2026-05-14T07:11:00Z",
+      "state": {
+        "cursor": { "round": 1, "phase": "task_scoring_debrief" },
+        "aliveAgentIds": [
+          "agent-alpha",
+          "agent-bravo",
+          "agent-charlie",
+          "agent-delta",
+          "agent-analyst",
+          "agent-saboteur"
+        ],
+        "eliminatedAgentIds": [],
+        "scoreByAgent": {
+          "agent-alpha": 2,
+          "agent-bravo": 1,
+          "agent-charlie": 1,
+          "agent-delta": 2,
+          "agent-analyst": 1,
+          "agent-saboteur": 2
+        },
+        "openAwaitIds": []
+      }
+    },
+    {
+      "snapshotId": "snapshot_round3_pause",
+      "runId": "run_c5_seed_0001",
+      "cursor": { "round": 3, "phase": "simultaneous_reveal" },
+      "capturedAt": "2026-05-14T07:20:10Z",
+      "state": {
+        "cursor": { "round": 3, "phase": "simultaneous_reveal" },
+        "aliveAgentIds": [
+          "agent-alpha",
+          "agent-bravo",
+          "agent-charlie",
+          "agent-delta",
+          "agent-analyst",
+          "agent-saboteur"
+        ],
+        "eliminatedAgentIds": [],
+        "scoreByAgent": {
+          "agent-alpha": 6,
+          "agent-bravo": 5,
+          "agent-charlie": 4,
+          "agent-delta": 5,
+          "agent-analyst": 4,
+          "agent-saboteur": 6
+        },
+        "openAwaitIds": [
+          "await_match_seed_0001_round3_publish"
+        ]
+      }
+    }
+  ],
+  "markers": [
+    {
+      "markerId": "marker_round2_reveal",
+      "runId": "run_c5_seed_0001",
+      "cursor": { "round": 2, "phase": "simultaneous_reveal" },
+      "markerType": "reveal",
+      "label": "Round 2 simultaneous reveal",
+      "sourceEventIds": ["evt_r2_reveal_01"]
+    },
+    {
+      "markerId": "marker_round3_await_open",
+      "runId": "run_c5_seed_0001",
+      "cursor": { "round": 3, "phase": "task_submission" },
+      "markerType": "await_open",
+      "label": "Approval required for guarded task publish",
+      "sourceEventIds": ["evt_r3_task_guard_01"],
+      "linkedAwaitId": "await_match_seed_0001_round3_publish"
+    }
+  ]
+}

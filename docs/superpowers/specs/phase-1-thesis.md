@@ -104,12 +104,13 @@ If (6) holds in particular, presentation is no longer downstream of the data mod
 | Structured commitments schema | REC-04, AK-7 |
 | Observation vs intervention separation | REC-08, AK-3, `docs/superpowers/specs/observation-vs-intervention.md` |
 | Thought-trace labeling | REC-07, AK-4, `docs/superpowers/specs/thought-trace-labeling.md` |
+| Layered UI separation (public / private / alerts / interventions) | REC-11, AK-13, `docs/superpowers/specs/layered-ui.md` |
 | Roster identity / cast / model badges | REC-13, AK-10 |
-| Pressure shell / tension director | REC-14, AK-11 |
+| Pressure shell / tension director | REC-14, AK-11, `docs/superpowers/specs/tension-director.md` |
 | Swift control room | REC-09, AK-14 |
 | Discord RBAC and audit | REC-10, AK-15 |
 | ACP client / orchestration layer / multi-session match mapping | FOLLOWUPS "Architecture and implementation" 1–4, 8 |
-| `awaiting` as canonical human-nudge state | REC-12, AK-12 |
+| `awaiting` as canonical human-nudge state | REC-12, AK-12, `docs/superpowers/specs/awaiting-human-nudge-state.md` |
 
 ## Reconciliation with existing artifacts
 

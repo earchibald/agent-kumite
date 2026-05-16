@@ -1,0 +1,11 @@
+{
+  "runId": "run_c4_seed_0001",
+  "matchId": "match_seed_0001",
+  "condition": "C4",
+  "runSeed": 1,
+  "rosterMode": "mixed-model",
+  "memoryMode": "on",
+  "operatorAffordanceSet": "observation-only",
+  "codeRevision": "fd4ae17",
+  "validityStatus": "valid"
+}

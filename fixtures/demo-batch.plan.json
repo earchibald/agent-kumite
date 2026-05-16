@@ -1,0 +1,15 @@
+{
+  "batchId": "demo_batch",
+  "seedLedger": [1, 2],
+  "targetMatchedSeedCount": 1,
+  "conditions": [
+    {
+      "condition": "C4",
+      "inputPath": "demo-match.input.json"
+    },
+    {
+      "condition": "C5",
+      "inputPath": "demo-match.input.json"
+    }
+  ]
+}

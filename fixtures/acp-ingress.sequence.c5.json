@@ -1,0 +1,112 @@
+[
+  {
+    "envelopeId": "acp_env_r3_phase_open",
+    "kind": "phase_transition",
+    "runId": "run_demo_c5_seed_0001",
+    "matchId": "match_demo_seed_0001",
+    "cursor": {
+      "round": 3,
+      "phase": "public_square"
+    },
+    "timestamp": "2026-05-15T03:20:00Z",
+    "source": {
+      "sessionId": "session_referee_1",
+      "serverId": "server_demo",
+      "messageId": "msg_phase_1"
+    },
+    "payload": {
+      "fromPhase": "structured_commitment_submission",
+      "toPhase": "public_square",
+      "actorAgentIds": [
+        "agent-alpha"
+      ],
+      "linkedCommitmentIds": [],
+      "commitmentClaims": [],
+      "summary": "Entered public square for round 3.",
+      "metadata": {
+        "transitionReason": "round_loop_advance"
+      }
+    }
+  },
+  {
+    "envelopeId": "acp_env_r3_await_open",
+    "kind": "await_opened",
+    "runId": "run_demo_c5_seed_0001",
+    "matchId": "match_demo_seed_0001",
+    "cursor": {
+      "round": 3,
+      "phase": "task_submission"
+    },
+    "timestamp": "2026-05-15T03:21:00Z",
+    "source": {
+      "sessionId": "session_orchestrator_1",
+      "serverId": "server_demo"
+    },
+    "payload": {
+      "await": {
+        "awaitId": "await_r3_task_approval",
+        "kind": "approval",
+        "layer": "intervention",
+        "status": "pending",
+        "scope": {
+          "matchId": "match_demo_seed_0001",
+          "runId": "run_demo_c5_seed_0001",
+          "round": 3,
+          "phase": "task_submission",
+          "targetAgentIds": [
+            "agent-saboteur"
+          ]
+        },
+        "prompt": "Approve publishing this task output?",
+        "details": {
+          "summary": "The agent is attempting a guarded task output.",
+          "proposedEffect": "Publish the task output to the shared run state.",
+          "artifacts": [
+            "task_output_r3_agent-saboteur"
+          ],
+          "context": {
+            "submissionId": "task_output_r3_agent-saboteur"
+          }
+        },
+        "choices": [
+          {
+            "choiceId": "approve",
+            "label": "Approve"
+          },
+          {
+            "choiceId": "reject",
+            "label": "Reject"
+          }
+        ],
+        "defaultChoice": "reject",
+        "openedAt": "2026-05-15T03:21:00Z",
+        "openedBy": "orchestrator",
+        "idempotencyKey": "await_r3_task_approval:v1"
+      }
+    }
+  },
+  {
+    "envelopeId": "acp_env_r3_await_resolved",
+    "kind": "await_resolved",
+    "runId": "run_demo_c5_seed_0001",
+    "matchId": "match_demo_seed_0001",
+    "cursor": {
+      "round": 3,
+      "phase": "task_submission"
+    },
+    "timestamp": "2026-05-15T03:21:15Z",
+    "source": {
+      "sessionId": "session_operator_1",
+      "serverId": "server_demo",
+      "agentId": "operator-1"
+    },
+    "payload": {
+      "awaitId": "await_r3_task_approval",
+      "kind": "approval",
+      "status": "resolved",
+      "choiceId": "approve",
+      "operatorId": "operator-1",
+      "resolvedAt": "2026-05-15T03:21:15Z"
+    }
+  }
+]

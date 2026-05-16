@@ -47,7 +47,7 @@ The six intervention types named in REC-08 split into three classes:
 | `approval` | Operator approves / rejects an agent's pending action | **C5-only** (gates execution) |
 | `role swap` | Operator reassigns an agent's role mid-match | **excluded from phase 1** (separate future condition) |
 | `freeze` | Operator halts an agent's turn-taking without resuming | **excluded from phase 1** (separate future condition) |
-| `removal` | Operator forcibly eliminates an agent | **excluded from phase 1** (separate future condition) |
+| `ejection` | Operator forcibly eliminates an agent | **excluded from phase 1** (separate future condition) |
 
 Plus three **baseline-equivalent** operator actions, explicitly legal in both C4 and C5 because they alter no agent state:
 
@@ -61,7 +61,7 @@ Plus three **baseline-equivalent** operator actions, explicitly legal in both C4
 
 These three are the operator surface that `awaiting`-style oversight workflows actually consist of in practice. They are **bounded** in effect — none of them on its own decides a match outcome — and their effect on subsequent agent action is observable through the same divergence and commitment-keeping metrics the harness already collects (REC-04, AK-7). That makes them the right population for "what does intervention as practiced in oversight workflows do?", which is what C5 is built to measure.
 
-### Why `role swap`, `freeze`, `removal` are excluded from phase-1 C5
+### Why `role swap`, `freeze`, `ejection` are excluded from phase-1 C5
 
 Each of these three is **individually outcome-dominating**: a single instance can decide a run's win condition. If we lumped them into C5 as ordinary intervention types, C5-vs-C4 deltas would be sensitive primarily to operator *style* (an operator who swaps once dominates one who only nudges) rather than to the C4-vs-C5 distinction we want to measure. They also have closer analogs in incident command and authority-style override than in the user-in-the-loop oversight workflows phase-1 wants to characterize.
 
@@ -69,7 +69,7 @@ The exclusion is "not yet", not "never":
 
 - They live in this spec as named placeholders, so future-condition design has stable handles to refer to.
 - The phase-1 surface specs (AK-13 layered UI, AK-14 Swift control room, AK-15 Discord RBAC) MUST surface them as disabled-in-phase-1 affordances rather than as missing buttons; an implementer who silently wires them up will contaminate C5 runs, so the surfaces own the discipline.
-- A future condition (e.g. C6 = mixed-model, on memory, swap-enabled; C7 = …, removal-enabled) introduces them one type at a time so the marginal effect of each can be attributed.
+- A future condition (e.g. C6 = mixed-model, on memory, swap-enabled; C7 = …, ejection-enabled) introduces them one type at a time so the marginal effect of each can be attributed.
 
 ## Per-run tagging discipline
 
@@ -105,15 +105,15 @@ The protocol intentionally separates the two questions so a finding on (2) is no
 Even with the taxonomy above, two hazards can leak signal across conditions and must be tracked rather than wished away:
 
 1. **Time-on-screen drift.** A C5 operator may drill, replay, and grimoire-inspect more than a C4 operator simply because the run is more interesting to them. Mitigation: AK-8 records operator action counts on both sides; the C4-vs-C5 delta is reported alongside operator-action delta so a reader can see whether intervention effect and attention effect are separable.
-2. **Affordance leakage.** A UI surface that displays intervention buttons for excluded types (role swap, freeze, removal) without disabling them in phase-1 will contaminate C5 runs the moment an operator clicks. Mitigation: AK-13 (layered UI), AK-14 (Swift control room), and AK-15 (Discord RBAC) must each enforce phase-1 affordance gating in their respective surfaces; runtime should refuse any condition-defining intervention not in `{question, nudge, approval}` for phase-1 runs.
+2. **Affordance leakage.** A UI surface that displays intervention buttons for excluded types (role swap, freeze, ejection) without disabling them in phase-1 will contaminate C5 runs the moment an operator clicks. Mitigation: AK-13 (layered UI), AK-14 (Swift control room), and AK-15 (Discord RBAC) must each enforce phase-1 affordance gating in their respective surfaces; runtime should refuse any condition-defining intervention not in `{question, nudge, approval}` for phase-1 runs.
 
 Neither hazard is fully eliminated by spec text; the spec's job is to name them so the surface specs and the harness know they have to handle them.
 
 ## Out of scope for this spec
 
 - **Agent-side observation knowledge as a baseline variable.** Handled by C4* as opt-in only; never folded into the C1–C5 gating matrix.
-- **Phase-2 interventions (role swap, freeze, removal).** Named here as future-condition placeholders; their experimental design is deferred.
-- **The intervention payload schema.** Belongs to AK-7 (structured commitments and intervention records) and AK-12 (`awaiting` resume payloads).
+- **Phase-2 interventions (role swap, freeze, ejection).** Named here as future-condition placeholders; their experimental design is deferred.
+- **The intervention payload schema.** Belongs to AK-7 (structured commitments and intervention records) and AK-12 (`docs/superpowers/specs/awaiting-human-nudge-state.md`).
 - **The operator UI for intervening.** Belongs to AK-13 / AK-14 / AK-15.
 - **The grimoire / referee god-view.** Belongs to AK-8.
 
@@ -126,7 +126,7 @@ Neither hazard is fully eliminated by spec text; the spec's job is to name them 
 - AK-6 (benchmark protocol) — consumes per-run intervention tagging and density metrics.
 - AK-7 (structured commitments) — owns the intervention payload schema referenced here.
 - AK-8 (referee grimoire) — owns operator-action instrumentation channel.
-- AK-12 (`awaiting` as canonical human-nudge state) — owns the pause/resume mechanism C5 routes through.
+- AK-12 (`awaiting` as canonical human-nudge state) — owns the pause/resume mechanism C5 routes through in `docs/superpowers/specs/awaiting-human-nudge-state.md`.
 - AK-13 / AK-14 / AK-15 — own the surfaces that must enforce phase-1 affordance gating.
 
 [^kumite-report]: `agent-researchers/agent-kumite/Agent Kumite.md` — the long-form research report. REC-08 is in §"Recommendation Task List"; the C1–C5 condition matrix is in §5.

@@ -1,0 +1,67 @@
+{
+  "name": "@agent-kumite/core",
+  "version": "0.0.0",
+  "description": "Core runtime schemas and validation helpers for Agent Kumite.",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json",
+    "gui:build": "swift build --package-path apps/control-room",
+    "gui:test": "swift test --package-path apps/control-room",
+    "gui:prepare-demo": "mkdir -p out/gui/demo && npm run bundle -- --input fixtures/demo-match.input.json --output-dir out/gui/demo --pretty && npm run project -- --input out/gui/demo/artifact-bundle.json --output out/gui/demo/control-room.json --pretty && npm run live-project -- --manifest fixtures/run-manifest.live.c5.json --roster fixtures/roster.demo.json --ingress fixtures/acp-ingress.sequence.c5.json --output out/gui/demo/live-control-room.json --pretty",
+    "gui:demo": "npm run gui:prepare-demo && npm run gui:run -- --projection out/gui/demo/control-room.json",
+    "gui:demo:live": "npm run gui:prepare-demo && npm run gui:run -- --projection out/gui/demo/live-control-room.json",
+    "gui:run": "swift run --package-path apps/control-room AgentKumiteControlRoom",
+    "simulate": "node dist/cli.js",
+    "report": "node dist/report-cli.js",
+    "live-export-acp": "node dist/runtime-acp-ingress-cli.js",
+    "live-stream-runtime": "node dist/runtime-live-stream-cli.js",
+    "live-bundle": "node dist/runtime-live-bundle-cli.js",
+    "project": "node dist/projection-cli.js",
+    "live-store": "node dist/live-run-store-cli.js",
+    "live-append": "node dist/live-store-append-cli.js",
+    "live-project": "node dist/live-projection-cli.js",
+    "live-socket": "node dist/live-ingestion-socket-cli.js",
+    "live-bridge": "node dist/live-ingestion-socket-bridge-cli.js",
+    "live-inspect": "node dist/live-ingestion-socket-inspect-cli.js",
+    "live-follow": "node dist/live-ingestion-socket-follow-cli.js",
+    "replay": "node dist/replay-cli.js",
+    "bundle": "node dist/bundle-cli.js",
+    "batch": "node dist/batch-cli.js",
+    "matrix": "node dist/matrix-cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "agent-kumite-harness": "./dist/cli.js",
+    "agent-kumite-report": "./dist/report-cli.js",
+    "agent-kumite-live-export-acp": "./dist/runtime-acp-ingress-cli.js",
+    "agent-kumite-live-stream-runtime": "./dist/runtime-live-stream-cli.js",
+    "agent-kumite-live-bundle": "./dist/runtime-live-bundle-cli.js",
+    "agent-kumite-project": "./dist/projection-cli.js",
+    "agent-kumite-live-store": "./dist/live-run-store-cli.js",
+    "agent-kumite-live-append": "./dist/live-store-append-cli.js",
+    "agent-kumite-live-project": "./dist/live-projection-cli.js",
+    "agent-kumite-live-socket": "./dist/live-ingestion-socket-cli.js",
+    "agent-kumite-live-bridge": "./dist/live-ingestion-socket-bridge-cli.js",
+    "agent-kumite-live-inspect": "./dist/live-ingestion-socket-inspect-cli.js",
+    "agent-kumite-live-follow": "./dist/live-ingestion-socket-follow-cli.js",
+    "agent-kumite-replay": "./dist/replay-cli.js",
+    "agent-kumite-bundle": "./dist/bundle-cli.js",
+    "agent-kumite-batch": "./dist/batch-cli.js",
+    "agent-kumite-matrix": "./dist/matrix-cli.js"
+  },
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.49"
+  },
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
+  }
+}
