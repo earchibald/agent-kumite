@@ -16,7 +16,6 @@ enum ProjectionKind: String, Equatable {
 
 enum ControlRoomScreen: String, CaseIterable, Identifiable, Hashable {
     case arena
-    case home
     case callsheet
     case liveOps
     case replayLab
@@ -28,8 +27,6 @@ enum ControlRoomScreen: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .arena:
             "Arena"
-        case .home:
-            "Home"
         case .callsheet:
             "Callsheet"
         case .liveOps:
@@ -45,8 +42,6 @@ enum ControlRoomScreen: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .arena:
             "sportscourt"
-        case .home:
-            "rectangle.3.group"
         case .callsheet:
             "person.3.sequence"
         case .liveOps:

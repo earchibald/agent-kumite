@@ -1,5 +1,10 @@
 import SwiftUI
 
+/// The Arena scene — a single staged surface that reads like a spectator
+/// broadcast of a live AI match. It absorbs the old static Home dashboard:
+/// marquee, center-stage pressure shell with staged cast entrances, the
+/// dramatized focal beat, a live event ticker, and a cast scoreboard. The
+/// operator transport is kept but visually demoted below the show.
 struct ArenaView: View {
     let projection: LoadedProjection
     @Bindable var model: ControlRoomAppModel
@@ -9,37 +14,58 @@ struct ArenaView: View {
     }
 
     @State private var scrubDirection: ScrubDirection = .none
+    @State private var castEntered = false
 
     var body: some View {
         if model.presentation.hasFocus, model.presentation.focusIndex < markers.count {
-            let marker = markers[model.presentation.focusIndex]
+            let focusIndex = model.presentation.focusIndex
+            let marker = markers[focusIndex]
+            let band = PressureBand(label: projection.pressurePresentation.band)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    MissionHeroHeader(
-                        eyebrow: "Arena · \(projection.pressurePresentation.band)",
-                        title: marker.label,
-                        subtitle: "One focal beat at a time. \(projection.pressurePresentation.headline)"
+                VStack(alignment: .leading, spacing: 24) {
+                    ArenaMarquee(
+                        projection: projection,
+                        beatNumber: focusIndex + 1,
+                        beatCount: markers.count
                     )
 
-                    FocalBeatCard(marker: marker, projection: projection) {
+                    CenterStageShell(
+                        projection: projection,
+                        band: band,
+                        castEntered: castEntered
+                    )
+
+                    SpotlightBeatCard(marker: marker, projection: projection) {
                         model.inspect(.marker(marker))
                     }
                     .id(marker.id)
                     .spotlightHandoff(id: marker.id)
-                    .replayScrub(direction: scrubDirection, value: model.presentation.focusIndex)
+                    .replayScrub(direction: scrubDirection, value: focusIndex)
                     .betrayalFlash(active: BetrayalFlash.isTriggered(byMarkerType: marker.markerType))
 
-                    TransportBar(model: model)
+                    EventTickerView(
+                        markers: markers,
+                        focusIndex: focusIndex,
+                        accentColor: projection.pressurePresentation.color
+                    ) { index in
+                        model.focusBeat(at: index)
+                    }
 
-                    Text("Beat \(model.presentation.focusIndex + 1) of \(markers.count) · \(marker.markerType.replacingOccurrences(of: "_", with: " "))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    CastLadderStrip(
+                        rows: projection.callsheet.sortedByPressure,
+                        castEntered: castEntered
+                    ) { row in
+                        model.inspect(.agent(row))
+                    }
+
+                    ArenaTransportBar(model: model)
                 }
                 .padding(28)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(ControlRoomBackdrop())
+            .onAppear { castEntered = true }
             .onChange(of: model.presentation.focusIndex) { oldValue, newValue in
                 scrubDirection = ScrubDirection.between(
                     previousIndex: oldValue,
@@ -58,26 +84,116 @@ struct ArenaView: View {
             ContentUnavailableView(
                 "Arena Idle",
                 systemImage: "sportscourt",
-                description: Text("This projection has no replay beats yet. The Arena focuses one beat at a time once markers exist.")
+                description: Text("This projection has no replay beats yet. The Arena stages the match once the first beat lands.")
             )
             .background(ControlRoomBackdrop())
         }
     }
 }
 
-private struct FocalBeatCard: View {
+/// Broadcast-style header: the pressure band is the dominant read, with match
+/// identity and the live beat counter as supporting copy.
+private struct ArenaMarquee: View {
+    let projection: LoadedProjection
+    let beatNumber: Int
+    let beatCount: Int
+
+    var body: some View {
+        let presentation = projection.pressurePresentation
+
+        VStack(alignment: .leading, spacing: 10) {
+            Text("LIVE · \(projection.home.condition.uppercased())")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(presentation.headline)
+                .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                .foregroundStyle(presentation.color)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(presentation.copy)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                TagPillView(text: presentation.band, color: presentation.color)
+                TagPillView(text: projection.home.currentCursor.label, color: .purple)
+                TagPillView(text: "Beat \(beatNumber) / \(beatCount)", color: .cyan)
+                TagPillView(text: "\(projection.home.survivingAgentCount) still in", color: .green)
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [presentation.color.opacity(0.28), Color.black.opacity(0.12)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(.rect(cornerRadius: 20))
+    }
+}
+
+/// The pressure shell promoted to the centerpiece. Rings contract on the
+/// canonical band and the cast walks on in a staged lineup.
+private struct CenterStageShell: View {
+    let projection: LoadedProjection
+    let band: PressureBand
+    let castEntered: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(projection.pressurePresentation.color)
+                    .frame(width: 12, height: 12)
+                    .eventPulse(
+                        active: EventPulse.isActive(activeAlertCount: projection.home.activeAlertCount),
+                        strength: EventPulse.strength(forBand: band)
+                    )
+                Text("CENTER STAGE · THE SHELL")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("Tension \(projection.tensionPercent)%")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(projection.pressurePresentation.color)
+            }
+
+            PressureShellVisualView(
+                rows: projection.callsheet.sortedByPressure,
+                contraction: ShellContraction.intensity(forBand: band),
+                castEntered: castEntered
+            )
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial)
+        .clipShape(.rect(cornerRadius: 20))
+    }
+}
+
+/// The focal beat dramatized as a spotlight card. Motion (handoff, scrub,
+/// betrayal flash) is attached by the caller off canonical focus.
+private struct SpotlightBeatCard: View {
     let marker: ReplayMarker
     let projection: LoadedProjection
     let onInspect: () -> Void
+
+    private var isReveal: Bool {
+        BetrayalFlash.isTriggered(byMarkerType: marker.markerType)
+    }
 
     var body: some View {
         Button(action: onInspect) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
-                    Image(systemName: "sparkle.magnifyingglass")
+                    Image(systemName: isReveal ? "bolt.fill" : "sparkle.magnifyingglass")
                         .font(.title2)
                         .foregroundStyle(projection.pressurePresentation.color)
-                    Text(marker.markerType.replacingOccurrences(of: "_", with: " ").capitalized)
+                    Text((isReveal ? "Reveal · " : "Spotlight · ")
+                        + marker.markerType.replacingOccurrences(of: "_", with: " ").capitalized)
                         .font(.headline)
                     Spacer()
                     TagPillView(text: marker.cursor.label, color: projection.pressurePresentation.color)
@@ -97,20 +213,148 @@ private struct FocalBeatCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .padding(26)
+            .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(projection.pressurePresentation.color.opacity(0.14))
-            .clipShape(.rect(cornerRadius: 20))
+            .background(projection.pressurePresentation.color.opacity(isReveal ? 0.2 : 0.14))
+            .clipShape(.rect(cornerRadius: 22))
         }
         .buttonStyle(.plain)
     }
 }
 
-private struct TransportBar: View {
+/// A sliding window of replay markers around the focal beat. The window slides
+/// (not shrinks) with `EventTickerWindow`, derived purely from canonical focus.
+private struct EventTickerView: View {
+    let markers: [ReplayMarker]
+    let focusIndex: Int
+    let accentColor: Color
+    let onSelect: (Int) -> Void
+
+    var body: some View {
+        let window = EventTickerWindow.indices(
+            count: markers.count,
+            focus: focusIndex,
+            radius: 3
+        )
+
+        VStack(alignment: .leading, spacing: 10) {
+            Text("LIVE EVENT TICKER")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(window, id: \.self) { index in
+                        let marker = markers[index]
+                        let isFocus = index == focusIndex
+                        let isReveal = BetrayalFlash.isTriggered(byMarkerType: marker.markerType)
+
+                        Button {
+                            onSelect(index)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    if isReveal {
+                                        Image(systemName: "bolt.fill")
+                                            .font(.caption2)
+                                    }
+                                    Text("Beat \(index + 1)")
+                                        .font(.caption2.weight(.semibold))
+                                }
+                                Text(marker.label)
+                                    .font(.caption.weight(isFocus ? .bold : .regular))
+                                    .lineLimit(2)
+                                    .frame(width: 150, alignment: .leading)
+                            }
+                            .padding(12)
+                            .background((isReveal ? Color.red : accentColor)
+                                .opacity(isFocus ? 0.28 : 0.12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(accentColor, lineWidth: isFocus ? 2 : 0)
+                            )
+                            .clipShape(.rect(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.96)),
+                            removal: .opacity
+                        ))
+                    }
+                }
+                .animation(GameMotion.replayScrubAnimation, value: focusIndex)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial)
+        .clipShape(.rect(cornerRadius: 18))
+    }
+}
+
+/// Spectator scoreboard salvaged from the old Home left rail. Each card is
+/// staged on with `castEntrance`, ordered by pressure rank.
+private struct CastLadderStrip: View {
+    let rows: [CallsheetRow]
+    let castEntered: Bool
+    let onInspect: (CallsheetRow) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("CAST · LIVE LADDER")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        Button {
+                            onInspect(row)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("\(row.seat). \(row.displayName)")
+                                    .font(.headline)
+                                Text("pressure \(row.pressureScore)")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(row.suspicionColor)
+                                Text(row.ladderCopy)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            .frame(width: 200, alignment: .leading)
+                            .padding(14)
+                            .background(row.suspicionColor.opacity(0.14))
+                            .clipShape(.rect(cornerRadius: 14))
+                        }
+                        .buttonStyle(.plain)
+                        .castEntrance(index: index, entered: castEntered)
+                    }
+                }
+            }
+
+            Text("shaded card = elimination risk · the room is closing in")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial)
+        .clipShape(.rect(cornerRadius: 18))
+    }
+}
+
+/// Operator transport, intentionally demoted: compact, low-contrast, and last
+/// on the surface so the scene reads spectator-first.
+private struct ArenaTransportBar: View {
     @Bindable var model: ControlRoomAppModel
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
+            Text("OPERATOR")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.tertiary)
+
             Button {
                 model.focusPreviousBeat()
             } label: {
@@ -122,7 +366,7 @@ private struct TransportBar: View {
                 model.togglePlayback()
             } label: {
                 Image(systemName: model.presentation.isPlaying ? "pause.fill" : "play.fill")
-                    .frame(width: 26)
+                    .frame(width: 20)
             }
             .disabled(model.presentation.isAtEnd && model.presentation.isPlaying == false)
 
@@ -134,7 +378,7 @@ private struct TransportBar: View {
             .disabled(model.presentation.isAtEnd)
 
             Divider()
-                .frame(height: 22)
+                .frame(height: 18)
 
             Button("Restart") {
                 model.resetPresentation()
@@ -143,125 +387,15 @@ private struct TransportBar: View {
             Spacer()
 
             Text(model.presentation.isPlaying ? "Playing" : "Paused")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
-        .font(.title3)
-        .padding(18)
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial)
-        .clipShape(.rect(cornerRadius: 16))
-    }
-}
-
-struct HomeDashboardView: View {
-    let projection: LoadedProjection
-    let onInspect: (InspectorItem?) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Swift Spectacle Concept — Pressure Shell / Endgame Chamber")
-                .font(.largeTitle.weight(.bold))
-
-            ShellStrip(
-                title: "Top Strip",
-                items: [
-                    "Round \(projection.home.currentCursor.round) • \(projection.home.currentCursor.phase)",
-                    "\(projection.home.survivingAgentCount) alive",
-                    "Latest marker: \(projection.latestMarker?.label ?? "none")",
-                    "Tension: \(projection.tensionPercent)%"
-                ]
-            )
-
-            HSplitView {
-                ShellPanel(title: "Left Rail — Live Cast Ladder") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(projection.callsheet.sortedByPressure) { row in
-                            Button {
-                                onInspect(.agent(row))
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("\(row.seat). \(row.displayName) • pressure \(row.pressureScore)")
-                                        .font(.headline)
-                                    Text(row.ladderCopy)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(12)
-                                .background(.quinary)
-                                .clipShape(.rect(cornerRadius: 10))
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        Text("shaded bar = elimination risk • hot outline = last action still burning")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(minWidth: 260, idealWidth: 290)
-
-                ShellPanel(title: "Center Stage — Shrinking Pressure Shell") {
-                    PressureShellVisualView(
-                        rows: projection.callsheet.sortedByPressure,
-                        contraction: ShellContraction.intensity(
-                            forBand: PressureBand(label: projection.pressurePresentation.band)
-                        )
-                    )
-                }
-                .frame(minWidth: 420, idealWidth: 560)
-
-                ShellPanel(title: "Right Rail — Tension / Operator") {
-                    VStack(alignment: .leading, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Hot Signals")
-                                .font(.headline)
-                            ForEach(projection.hotSignals, id: \.self) { signal in
-                                Label(signal, systemImage: "flame")
-                            }
-                        }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Soundtrack / Cue Stack")
-                                .font(.headline)
-                            Text("Layer A: \(projection.pressurePresentation.band)")
-                            Text("Layer B: \(projection.latestMarker?.markerType ?? "idle")")
-                            Text("derived from match state only")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Operator Rail")
-                                .font(.headline)
-                            Text("Pause • Replay jump • Inspect cast")
-                            Text("Awaiting: \(projection.home.openAwaitCount) • Alerts: \(projection.home.activeAlertCount)")
-                        }
-
-                        Text("Interpret this as the room closing in.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(minWidth: 280, idealWidth: 320)
-            }
-
-            ShellStrip(
-                title: "Bottom Strip",
-                items: [
-                    "Replay markers \(projection.replay.markerCount)",
-                    "Proof callouts \(projection.betrayalCallouts.count)",
-                    "Final-two forecast: \(projection.finalForecast)"
-                ]
-            )
-        }
-        .padding(24)
-        .background(ControlRoomBackdrop())
+        .background(.quinary)
+        .clipShape(.rect(cornerRadius: 12))
     }
 }
 
@@ -1231,6 +1365,9 @@ private struct ControlRoomBackdrop: View {
         /// 0 = open shell at full radius, 1 = collapsed. Derived from the
         /// canonical pressure band, never a timer.
         var contraction: Double = 0
+        /// One-shot flag: when it flips true the cast walks onto the shell in a
+        /// staged lineup. Defaults true so non-staged callers are unaffected.
+        var castEntered: Bool = true
 
         /// Rings lose up to 30% of their radius as the band tightens.
         private var shellScale: CGFloat {
@@ -1254,7 +1391,8 @@ private struct ControlRoomBackdrop: View {
                         .foregroundStyle(.tertiary)
                         .frame(width: min(geometry.size.width, geometry.size.height) * 0.36 * shellScale)
 
-                    ForEach(Array(zip(rows.prefix(points.count), points)), id: \.0.id) { row, point in
+                    ForEach(Array(zip(rows.prefix(points.count), points).enumerated()), id: \.element.0.id) { index, pair in
+                        let (row, point) = pair
                         VStack(spacing: 2) {
                             Text(row.displayName)
                                 .font(.caption.weight(.semibold))
@@ -1265,6 +1403,7 @@ private struct ControlRoomBackdrop: View {
                         .background(.background)
                         .clipShape(Circle())
                         .overlay(Circle().stroke(row.suspicionColor, lineWidth: 3))
+                        .castEntrance(index: index, entered: castEntered)
                         .position(point)
                     }
 

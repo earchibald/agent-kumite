@@ -43,6 +43,17 @@ struct AgentKumiteControlRoomTests {
     }
 }
 
+struct ControlRoomScreenTests {
+    @Test("Arena is the first screen and the static Home screen is gone")
+    func arenaReplacesHome() {
+        let screens = ControlRoomScreen.allCases
+        #expect(screens.first == .arena)
+        #expect(screens.contains { $0.rawValue == "home" } == false)
+        #expect(screens.contains(.callsheet))
+        #expect(screens.count == 5)
+    }
+}
+
 struct PresentationStateTests {
     @Test("Empty beat list has no focus and cannot play")
     func emptyHasNoFocus() {
@@ -226,6 +237,39 @@ struct MotionSystemTests {
         #expect(open > 0)
         #expect(open < knifeEdge)
         #expect(knifeEdge == 1.0)
+    }
+
+    @Test("Cast entrance delay staggers per index and caps")
+    func castEntranceDelay() {
+        #expect(CastEntrance.delay(forIndex: 0) == 0)
+        #expect(CastEntrance.delay(forIndex: 1) == GameMotion.castEntranceStep)
+        #expect(CastEntrance.delay(forIndex: 3) == GameMotion.castEntranceStep * 3)
+        #expect(CastEntrance.delay(forIndex: 9999) == GameMotion.castEntranceCap)
+        #expect(CastEntrance.delay(forIndex: -2) == 0)
+        #expect(GameMotion.castEntranceStep > 0)
+        #expect(GameMotion.castEntranceCap >= GameMotion.castEntranceStep)
+    }
+
+    @Test("Event ticker window keeps a stable size and slides with focus")
+    func eventTickerWindow() {
+        // Empty timeline shows nothing.
+        #expect(EventTickerWindow.indices(count: 0, focus: 0, radius: 2) == [])
+
+        // Fewer markers than the window: show them all.
+        #expect(EventTickerWindow.indices(count: 3, focus: 1, radius: 2) == [0, 1, 2])
+
+        // Interior focus is centered in a full-size window.
+        #expect(EventTickerWindow.indices(count: 10, focus: 5, radius: 2) == [3, 4, 5, 6, 7])
+
+        // Window slides (not shrinks) when focus is near the start.
+        #expect(EventTickerWindow.indices(count: 10, focus: 0, radius: 2) == [0, 1, 2, 3, 4])
+
+        // Window slides (not shrinks) when focus is near the end.
+        #expect(EventTickerWindow.indices(count: 10, focus: 9, radius: 2) == [5, 6, 7, 8, 9])
+
+        // Out-of-range focus is clamped before windowing.
+        #expect(EventTickerWindow.indices(count: 10, focus: 99, radius: 2) == [5, 6, 7, 8, 9])
+        #expect(EventTickerWindow.indices(count: 10, focus: -4, radius: 2) == [0, 1, 2, 3, 4])
     }
 }
 
