@@ -273,6 +273,126 @@ struct MotionSystemTests {
     }
 }
 
+struct PressureBandSelectionTests {
+    @Test("Knife-edge when field is compressed or late round", arguments: [
+        (2, 1), (1, 4), (4, 5), (3, 6),
+    ])
+    func knifeEdge(surviving: Int, round: Int) {
+        #expect(PressureBandSelection.band(survivingAgentCount: surviving, round: round) == .knifeEdge)
+    }
+
+    @Test("Pressurized at the mid thresholds")
+    func pressurized() {
+        #expect(PressureBandSelection.band(survivingAgentCount: 3, round: 1) == .pressurized)
+        #expect(PressureBandSelection.band(survivingAgentCount: 5, round: 3) == .pressurized)
+    }
+
+    @Test("Tightening from round two, Open before that")
+    func tighteningAndOpen() {
+        #expect(PressureBandSelection.band(survivingAgentCount: 6, round: 2) == .tightening)
+        #expect(PressureBandSelection.band(survivingAgentCount: 6, round: 1) == .open)
+    }
+
+    @Test("Band severity is monotonic non-decreasing as the room tightens")
+    func monotonic() {
+        let order: [PressureBand] = [.open, .tightening, .pressurized, .knifeEdge]
+        func rank(_ b: PressureBand) -> Int { order.firstIndex(of: b)! }
+        var previous = 0
+        for round in 1...6 {
+            let current = rank(PressureBandSelection.band(survivingAgentCount: 6, round: round))
+            #expect(current >= previous)
+            previous = current
+        }
+    }
+}
+
+struct TensionGaugeTests {
+    @Test("Tension percent rises monotonically with the band", arguments: [
+        (PressureBand.open, PressureBand.tightening),
+        (.tightening, .pressurized),
+        (.pressurized, .knifeEdge),
+    ])
+    func monotonic(lower: PressureBand, higher: PressureBand) {
+        #expect(TensionGauge.percent(forBand: lower) < TensionGauge.percent(forBand: higher))
+    }
+
+    @Test("Tension percent stays within 0...100")
+    func bounded() {
+        for band in PressureBand.allCases {
+            let pct = TensionGauge.percent(forBand: band)
+            #expect(pct >= 0 && pct <= 100)
+        }
+    }
+
+    @Test("Tension percent preserves the legacy mapping", arguments: [
+        (PressureBand.open, 24),
+        (.tightening, 48),
+        (.pressurized, 72),
+        (.knifeEdge, 87),
+    ])
+    func legacyMapping(band: PressureBand, expected: Int) {
+        #expect(TensionGauge.percent(forBand: band) == expected)
+    }
+}
+
+struct ArenaModeTests {
+    @Test("Eyebrow prefix per mode keeps Arena reading LIVE", arguments: [
+        (ArenaMode.operating, "LIVE · C4"),
+        (.live, "LIVE OPS · C4"),
+        (.recap, "RECAP · C4"),
+    ])
+    func eyebrow(mode: ArenaMode, expected: String) {
+        #expect(MarqueePresentation.eyebrow(mode: mode, condition: "c4") == expected)
+    }
+
+    @Test("Recap hides the live beat counter and survivor pill")
+    func recapHidesLiveChrome() {
+        #expect(MarqueePresentation.showsBeatCounter(mode: .recap) == false)
+        #expect(MarqueePresentation.showsSurvivorPill(mode: .recap) == false)
+    }
+
+    @Test("Live and operating keep live chrome", arguments: [ArenaMode.live, .operating])
+    func liveKeepsChrome(mode: ArenaMode) {
+        #expect(MarqueePresentation.showsBeatCounter(mode: mode))
+        #expect(MarqueePresentation.showsSurvivorPill(mode: mode))
+    }
+
+    @Test("Mode selection: live projection with an open match runs live")
+    func selectionLive() {
+        #expect(ArenaModeSelection.mode(forKind: .live, matchStatus: "live") == .live)
+    }
+
+    @Test("Mode selection: control projection and unknown/closed status run recap", arguments: [
+        (ProjectionKind.control, String?.none),
+        (.control, "closed"),
+        (.live, "closed"),
+        (.live, String?.none),
+    ])
+    func selectionRecap(kind: ProjectionKind, status: String?) {
+        #expect(ArenaModeSelection.mode(forKind: kind, matchStatus: status) == .recap)
+    }
+}
+
+struct SpotlightSnapshotSelectionTests {
+    @Test("Empty list has no spotlight")
+    func empty() {
+        #expect(SpotlightSnapshotSelection.index(count: 0, selected: nil) == nil)
+        #expect(SpotlightSnapshotSelection.index(count: 0, selected: 3) == nil)
+    }
+
+    @Test("No selection spotlights the latest snapshot")
+    func latest() {
+        #expect(SpotlightSnapshotSelection.index(count: 5, selected: nil) == 4)
+    }
+
+    @Test("Selection passes through and clamps", arguments: [
+        (2, 2), (0, 0), (-3, 0), (9, 4),
+    ])
+    func clamps(selected: Int, expected: Int) {
+        #expect(SpotlightSnapshotSelection.index(count: 5, selected: selected) == expected)
+    }
+}
+
 private let controlProjectionJSON = #"""
 {
   "manifest": {

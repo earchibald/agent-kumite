@@ -181,6 +181,104 @@ enum EventPulse {
     }
 }
 
+// MARK: - Canonical pressure derivation (unit-tested)
+
+enum PressureBandSelection {
+    /// The canonical pressure band for the current room. Monotonic: a more
+    /// compressed field or later round never produces a calmer band. This is
+    /// the single decision behind `LoadedProjection.pressurePresentation`.
+    static func band(survivingAgentCount: Int, round: Int) -> PressureBand {
+        if survivingAgentCount <= 2 || round >= 5 { return .knifeEdge }
+        if survivingAgentCount <= 3 || round >= 3 { return .pressurized }
+        if round >= 2 { return .tightening }
+        return .open
+    }
+}
+
+enum TensionGauge {
+    /// Tension readout for the pressure band. Strictly increasing in band
+    /// severity so the gauge always reads hotter as the room tightens. Values
+    /// (24/48/72/87) preserve the legacy `tensionPercent` mapping verbatim;
+    /// `knifeEdge` stops at 87 by design, leaving headroom rather than pinning
+    /// the gauge to 100.
+    static func percent(forBand band: PressureBand) -> Int {
+        switch band {
+        case .open: 24
+        case .tightening: 48
+        case .pressurized: 72
+        case .knifeEdge: 87
+        }
+    }
+}
+
+// MARK: - Arena mode (unit-tested)
+
+/// Which stance a screen takes on the same projection. The grammar is shared;
+/// the mode only changes labeling and which live-only chrome shows — never the
+/// layout branching inside a component.
+enum ArenaMode: String, CaseIterable {
+    /// `ArenaView` — staged spectator broadcast of a live match.
+    case operating
+    /// `LiveOpsView` — operating the same live match.
+    case live
+    /// `ReplayLabView` — after-the-fact recap and proof.
+    case recap
+}
+
+enum MarqueePresentation {
+    /// Marquee eyebrow, e.g. `LIVE · C4`. `operating` stays "LIVE" so the Arena
+    /// header is unchanged from AK-63; `live` is the operator stance; `recap`
+    /// is past-tense.
+    static func eyebrow(mode: ArenaMode, condition: String) -> String {
+        let prefix: String
+        switch mode {
+        case .operating: prefix = "LIVE"
+        case .live: prefix = "LIVE OPS"
+        case .recap: prefix = "RECAP"
+        }
+        return "\(prefix) · \(condition.uppercased())"
+    }
+
+    /// The live "Beat n / N" counter is shown for `.operating` (the Arena
+    /// spectator broadcast) and `.live` (operator), where a match clock is
+    /// running. `.recap` is scrubbed, not tracked, so it is hidden there.
+    static func showsBeatCounter(mode: ArenaMode) -> Bool {
+        mode != .recap
+    }
+
+    /// The "X still in" survivor pill is shown while the match is ongoing
+    /// (`.operating` and `.live`); `.recap` is post-match, so it is hidden.
+    static func showsSurvivorPill(mode: ArenaMode) -> Bool {
+        mode != .recap
+    }
+}
+
+enum ArenaModeSelection {
+    /// The mode a non-Arena screen runs in. A live projection whose match is
+    /// still open is `.live`; everything else (benchmark/control, or a live
+    /// projection whose match has closed) is `.recap`. `ArenaView` always
+    /// passes `.operating` explicitly and does not use this.
+    /// Canonical `matchStatus` values are "live" / "closed" per the projection API.
+    static func mode(forKind kind: ProjectionKind, matchStatus: String?) -> ArenaMode {
+        if kind == .live, matchStatus?.lowercased() == "live" {
+            return .live
+        }
+        return .recap
+    }
+}
+
+enum SpotlightSnapshotSelection {
+    /// Index of the snapshot to promote into the spotlight proof card. Falls
+    /// back to the latest (last) snapshot when nothing is selected; clamps
+    /// out-of-range selections; `nil` for an empty list. Mirrors
+    /// `EventTickerWindow`/`PresentationState` clamp semantics.
+    static func index(count: Int, selected: Int?) -> Int? {
+        guard count > 0 else { return nil }
+        guard let selected else { return count - 1 }
+        return min(max(0, selected), count - 1)
+    }
+}
+
 // MARK: - SwiftUI primitives
 
 extension View {
