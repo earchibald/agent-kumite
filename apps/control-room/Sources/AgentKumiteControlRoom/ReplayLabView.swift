@@ -39,6 +39,11 @@ struct ReplayLabView: View {
                 description: Text("This projection has no replay markers or snapshots yet. The recap reel fills in once the match produces beats.")
             )
             .background(ControlRoomBackdrop())
+            .onChange(of: projection.manifest.runId) { _, _ in
+                focusIndex = 0
+                snapshotSelection = nil
+                scrubDirection = .none
+            }
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -99,6 +104,11 @@ struct ReplayLabView: View {
             }
             .background(ControlRoomBackdrop())
             .onAppear { reelEntered = true }
+            .onChange(of: projection.manifest.runId) { _, _ in
+                focusIndex = 0
+                snapshotSelection = nil
+                scrubDirection = .none
+            }
         }
     }
 }
