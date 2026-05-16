@@ -54,6 +54,74 @@ enum ControlRoomScreen: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// App-side presentation layer over the immutable projection JSON.
+///
+/// The projection contract stays the source of truth; this struct only tracks
+/// *how* the Arena presents it — a clock/focus into the ordered beat list plus
+/// staged playback. It owns no projection data and never mutates the JSON.
+struct PresentationState {
+    private(set) var focusIndex: Int
+    private(set) var isPlaying: Bool
+    private var beatCount: Int
+
+    init(beatCount: Int) {
+        self.beatCount = max(0, beatCount)
+        focusIndex = 0
+        isPlaying = false
+    }
+
+    var hasFocus: Bool {
+        beatCount > 0
+    }
+
+    var isAtEnd: Bool {
+        hasFocus && focusIndex == beatCount - 1
+    }
+
+    mutating func play() {
+        guard hasFocus else { return }
+        isPlaying = true
+    }
+
+    mutating func pause() {
+        isPlaying = false
+    }
+
+    mutating func stepForward() {
+        guard hasFocus else { return }
+
+        if focusIndex < beatCount - 1 {
+            focusIndex += 1
+        } else {
+            isPlaying = false
+        }
+    }
+
+    mutating func stepBackward() {
+        guard hasFocus else { return }
+        focusIndex = max(0, focusIndex - 1)
+    }
+
+    mutating func jump(to index: Int) {
+        guard hasFocus else {
+            focusIndex = 0
+            return
+        }
+        focusIndex = min(max(0, index), beatCount - 1)
+    }
+
+    mutating func reset() {
+        focusIndex = 0
+        isPlaying = false
+    }
+
+    mutating func rebind(beatCount newCount: Int) {
+        beatCount = max(0, newCount)
+        isPlaying = false
+        focusIndex = hasFocus ? min(focusIndex, beatCount - 1) : 0
+    }
+}
+
 enum ProjectionLoadError: LocalizedError {
     case unsupportedFormat
 

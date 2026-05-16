@@ -43,6 +43,116 @@ struct AgentKumiteControlRoomTests {
     }
 }
 
+struct PresentationStateTests {
+    @Test("Empty beat list has no focus and cannot play")
+    func emptyHasNoFocus() {
+        var state = PresentationState(beatCount: 0)
+
+        #expect(state.hasFocus == false)
+        #expect(state.focusIndex == 0)
+        #expect(state.isPlaying == false)
+
+        state.play()
+        #expect(state.isPlaying == false)
+    }
+
+    @Test("Non-empty beat list starts focused on the first beat")
+    func startsOnFirstBeat() {
+        let state = PresentationState(beatCount: 5)
+
+        #expect(state.hasFocus)
+        #expect(state.focusIndex == 0)
+        #expect(state.isAtEnd == false)
+    }
+
+    @Test("Stepping forward advances one focal beat at a time")
+    func stepForwardAdvances() {
+        var state = PresentationState(beatCount: 3)
+
+        state.stepForward()
+        #expect(state.focusIndex == 1)
+
+        state.stepForward()
+        #expect(state.focusIndex == 2)
+        #expect(state.isAtEnd)
+    }
+
+    @Test("Stepping forward at the last beat clamps and halts playback")
+    func stepForwardAtEndHalts() {
+        var state = PresentationState(beatCount: 2)
+        state.play()
+        state.stepForward()
+
+        #expect(state.focusIndex == 1)
+        #expect(state.isAtEnd)
+
+        state.stepForward()
+        #expect(state.focusIndex == 1)
+        #expect(state.isPlaying == false)
+    }
+
+    @Test("Stepping backward retreats and clamps at the first beat")
+    func stepBackwardClamps() {
+        var state = PresentationState(beatCount: 3)
+        state.jump(to: 2)
+
+        state.stepBackward()
+        #expect(state.focusIndex == 1)
+
+        state.stepBackward()
+        state.stepBackward()
+        #expect(state.focusIndex == 0)
+    }
+
+    @Test("Jumping clamps out-of-range targets into the valid range")
+    func jumpClamps() {
+        var state = PresentationState(beatCount: 4)
+
+        state.jump(to: 99)
+        #expect(state.focusIndex == 3)
+
+        state.jump(to: -5)
+        #expect(state.focusIndex == 0)
+    }
+
+    @Test("Play and pause toggle staged playback")
+    func playPauseToggles() {
+        var state = PresentationState(beatCount: 3)
+
+        state.play()
+        #expect(state.isPlaying)
+
+        state.pause()
+        #expect(state.isPlaying == false)
+    }
+
+    @Test("Reset returns focus to the first beat and stops playback")
+    func resetReturnsToStart() {
+        var state = PresentationState(beatCount: 5)
+        state.jump(to: 4)
+        state.play()
+
+        state.reset()
+        #expect(state.focusIndex == 0)
+        #expect(state.isPlaying == false)
+    }
+
+    @Test("Rebinding to a new projection clamps focus and stops playback")
+    func rebindClampsAndStops() {
+        var state = PresentationState(beatCount: 6)
+        state.jump(to: 5)
+        state.play()
+
+        state.rebind(beatCount: 2)
+        #expect(state.focusIndex == 1)
+        #expect(state.isPlaying == false)
+
+        state.rebind(beatCount: 0)
+        #expect(state.hasFocus == false)
+        #expect(state.focusIndex == 0)
+    }
+}
+
 private let controlProjectionJSON = #"""
 {
   "manifest": {
