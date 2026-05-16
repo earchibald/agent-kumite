@@ -239,13 +239,15 @@ enum MarqueePresentation {
         return "\(prefix) · \(condition.uppercased())"
     }
 
-    /// The live "Beat n / N" counter only makes sense while a match clock is
-    /// running — recap is scrubbed, not tracked.
+    /// The live "Beat n / N" counter is shown for `.operating` (the Arena
+    /// spectator broadcast) and `.live` (operator), where a match clock is
+    /// running. `.recap` is scrubbed, not tracked, so it is hidden there.
     static func showsBeatCounter(mode: ArenaMode) -> Bool {
         mode != .recap
     }
 
-    /// "X still in" survivor pill is live-only.
+    /// The "X still in" survivor pill is shown while the match is ongoing
+    /// (`.operating` and `.live`); `.recap` is post-match, so it is hidden.
     static func showsSurvivorPill(mode: ArenaMode) -> Bool {
         mode != .recap
     }
@@ -256,6 +258,7 @@ enum ArenaModeSelection {
     /// still open is `.live`; everything else (benchmark/control, or a live
     /// projection whose match has closed) is `.recap`. `ArenaView` always
     /// passes `.operating` explicitly and does not use this.
+    /// Canonical `matchStatus` values are "live" / "closed" per the projection API.
     static func mode(forKind kind: ProjectionKind, matchStatus: String?) -> ArenaMode {
         if kind == .live, matchStatus?.lowercased() == "live" {
             return .live
