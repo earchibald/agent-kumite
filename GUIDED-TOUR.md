@@ -35,6 +35,7 @@ What you **cannot** do here yet is run a live ACP-backed match with real multi-s
 | See the benchmark-facing summary | Open `out/demo/benchmark-summary.json` | This is the compact comparison-ready readout for one run. |
 | See the operator/control-room view | `npm run project -- --input out/demo/artifact-bundle.json --output out/demo/control-room.json --pretty` | Shows how the same run becomes layered operator-facing state. |
 | Generate replay helpers | `npm run replay -- --input out/demo/control-room.json --output out/demo/replay-lab.json --marker marker_evt_r3_simultaneous_reveal_vote_reveal_1 --from 3:public_square --to 3:simultaneous_reveal --pretty` | Gives you jump targets and diffs for replay/debug-style inspection. |
+| Watch the run as a broadcast | `npm run gui:demo` (or `npm run gui:demo:live`) | Launches the macOS Arena-first control-room: opens on the staged Arena scene with a focal-beat transport, with Live Ops / Replay / Callsheet / Aftermath sharing the same broadcast grammar. Read-only over the same projection JSON. |
 | Run a small benchmark demo | `npm run batch -- --plan fixtures/demo-batch.plan.json --output-dir out/batch --pretty` | Shows the matched-seed batch/matrix workflow instead of a single run. |
 | Compare conditions directly | `npm run matrix -- --input out/demo/benchmark-summary.json --input fixtures/artifact-bundle.minimal.c5.json --output out/matrix/matrix-summary.json --report-output out/matrix/matrix-report.txt --pretty` | Lets you look at condition deltas without running a whole batch. |
 
@@ -160,4 +161,4 @@ That is why the repo feels very strong as a **local deterministic harness** and 
 
 ## Bottom line
 
-> **What you can do here today is run, inspect, compare, project, and replay deterministic Agent Kumite matches — and the reason to do that is to make the arena legible as a benchmark, not just entertaining as a concept.**
+> **What you can do here today is run, inspect, compare, project, replay, and watch (in the Arena-first macOS control-room) deterministic Agent Kumite matches — and the reason to do that is to make the arena legible as a benchmark, not just entertaining as a concept.**

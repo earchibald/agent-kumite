@@ -200,7 +200,11 @@ Use this when you want the live-path adapter surface:
 
 ### 6. Launch the macOS control-room GUI
 
-The repo now includes a standalone SwiftUI package at `apps/control-room` that renders the five-screen control-room shell over the same JSON projections the CLI emits.
+The repo includes a standalone SwiftUI package at `apps/control-room` that renders an **Arena-first** control-room over the same JSON projections the CLI emits.
+
+**Arena is the default surface.** Instead of opening on a static dashboard, the app opens on a staged broadcast scene that reads as a spectator view of a live AI match: a pressure-band marquee, a center-stage pressure shell with staged cast entrances, a dramatized spotlight beat card, a sliding live event ticker, a cast scoreboard, and a deliberately demoted operator transport. An app-side presentation clock walks one focal beat at a time over `replay.markers` with a transport bar (prev / play-pause / next / restart) and a 4 s auto-advance that halts at the last beat. All motion is state-driven — driven by canonical projection state, not decorative timers or randomness, so a quiet match shows no motion.
+
+The five screens are **Arena** (default), **Callsheet**, **Live Ops**, **Replay Lab**, and **Aftermath**, selectable from the sidebar. Live Ops and Replay Lab share the Arena broadcast grammar rather than collapsing into tables: Live Ops reads as *operating the same live match* (shared marquee + center stage, operator layers staged as rail cards, the awaiting queue as actionable spotlight cards); Replay Lab reads as *recap + scrub + proof*, where the event ticker itself is the scrubber driving the spotlight beat card plus a canonical-snapshot proof ladder. The underlying projection JSON contract is unchanged — the app only adds app-side presentation state over the immutable `control-room.json` / `live-control-room.json` the CLI already emits.
 
 Build the GUI package once:
 
@@ -230,7 +234,7 @@ npm run gui:demo
 npm run gui:demo:live
 ```
 
-The first slice is intentionally read-only: it lets you inspect home, callsheet, live-ops, replay, and aftermath views over canonical projection data without bypassing the existing runtime pipeline.
+The GUI is intentionally read-only: it lets you watch and scrub the Arena, Callsheet, Live Ops, Replay Lab, and Aftermath surfaces over canonical projection data without bypassing or feeding back into the existing runtime pipeline. `--projection control-room.json` shows the full layered (post-match) projection; `--projection live-control-room.json` shows the live-path projection.
 
 If you already have a persisted live store, you can project from that directly:
 
