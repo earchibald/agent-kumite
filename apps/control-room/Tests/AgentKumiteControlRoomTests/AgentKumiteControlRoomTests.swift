@@ -273,6 +273,58 @@ struct MotionSystemTests {
     }
 }
 
+struct PressureBandSelectionTests {
+    @Test("Knife-edge when field is compressed or late round", arguments: [
+        (2, 1), (1, 4), (4, 5), (3, 6),
+    ])
+    func knifeEdge(surviving: Int, round: Int) {
+        #expect(PressureBandSelection.band(survivingAgentCount: surviving, round: round) == .knifeEdge)
+    }
+
+    @Test("Pressurized at the mid thresholds")
+    func pressurized() {
+        #expect(PressureBandSelection.band(survivingAgentCount: 3, round: 1) == .pressurized)
+        #expect(PressureBandSelection.band(survivingAgentCount: 5, round: 3) == .pressurized)
+    }
+
+    @Test("Tightening from round two, Open before that")
+    func tighteningAndOpen() {
+        #expect(PressureBandSelection.band(survivingAgentCount: 6, round: 2) == .tightening)
+        #expect(PressureBandSelection.band(survivingAgentCount: 6, round: 1) == .open)
+    }
+
+    @Test("Band severity is monotonic non-decreasing as the room tightens")
+    func monotonic() {
+        let order: [PressureBand] = [.open, .tightening, .pressurized, .knifeEdge]
+        func rank(_ b: PressureBand) -> Int { order.firstIndex(of: b)! }
+        var previous = 0
+        for round in 1...6 {
+            let current = rank(PressureBandSelection.band(survivingAgentCount: 6, round: round))
+            #expect(current >= previous)
+            previous = current
+        }
+    }
+}
+
+struct TensionGaugeTests {
+    @Test("Tension percent rises monotonically with the band", arguments: [
+        (PressureBand.open, PressureBand.tightening),
+        (.tightening, .pressurized),
+        (.pressurized, .knifeEdge),
+    ])
+    func monotonic(lower: PressureBand, higher: PressureBand) {
+        #expect(TensionGauge.percent(forBand: lower) < TensionGauge.percent(forBand: higher))
+    }
+
+    @Test("Tension percent stays within 0...100")
+    func bounded() {
+        for band in PressureBand.allCases {
+            let pct = TensionGauge.percent(forBand: band)
+            #expect(pct >= 0 && pct <= 100)
+        }
+    }
+}
+
 private let controlProjectionJSON = #"""
 {
   "manifest": {

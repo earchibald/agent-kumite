@@ -181,6 +181,33 @@ enum EventPulse {
     }
 }
 
+// MARK: - Canonical pressure derivation (unit-tested)
+
+enum PressureBandSelection {
+    /// The canonical pressure band for the current room. Monotonic: a more
+    /// compressed field or later round never produces a calmer band. This is
+    /// the single decision behind `LoadedProjection.pressurePresentation`.
+    static func band(survivingAgentCount: Int, round: Int) -> PressureBand {
+        if survivingAgentCount <= 2 || round >= 5 { return .knifeEdge }
+        if survivingAgentCount <= 3 || round >= 3 { return .pressurized }
+        if round >= 2 { return .tightening }
+        return .open
+    }
+}
+
+enum TensionGauge {
+    /// Tension readout (0...100) for the pressure band. Strictly increasing in
+    /// band severity so the gauge always reads hotter as the room tightens.
+    static func percent(forBand band: PressureBand) -> Int {
+        switch band {
+        case .open: 24
+        case .tightening: 48
+        case .pressurized: 72
+        case .knifeEdge: 87
+        }
+    }
+}
+
 // MARK: - SwiftUI primitives
 
 extension View {
