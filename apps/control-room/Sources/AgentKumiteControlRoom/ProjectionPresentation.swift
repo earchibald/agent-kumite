@@ -1,12 +1,16 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Pressure presentation
+
 struct PressurePresentation {
     let band: String
     let headline: String
     let copy: String
     let color: Color
 }
+
+// MARK: - LoadedProjection presentation derivation
 
 extension LoadedProjection {
     var featuredCast: [CallsheetRow] {
@@ -83,7 +87,12 @@ extension LoadedProjection {
     }
 
     var tensionPercent: Int {
-        TensionGauge.percent(forBand: PressureBand(label: pressurePresentation.band))
+        TensionGauge.percent(
+            forBand: PressureBandSelection.band(
+                survivingAgentCount: home.survivingAgentCount,
+                round: home.currentCursor.round
+            )
+        )
     }
 
     var hotSignals: [String] {
@@ -175,6 +184,8 @@ extension LoadedProjection {
         featuredCast.map { "\($0.modelBadge): \($0.suspicionLabel.lowercased()) / \($0.commitmentCount) commitments" }
     }
 }
+
+// MARK: - CallsheetRow presentation derivation
 
 extension CallsheetRow {
     var roleLabel: String {
@@ -275,6 +286,8 @@ extension CallsheetRow {
     }
 }
 
+// MARK: - Callsheet ordering
+
 extension Array where Element == CallsheetRow {
     var sortedByPressure: [CallsheetRow] {
         sorted {
@@ -285,6 +298,8 @@ extension Array where Element == CallsheetRow {
         }
     }
 }
+
+// MARK: - String helpers
 
 extension Array where Element == String {
     func uniqued() -> [String] {
