@@ -58,7 +58,8 @@ struct LiveOpsView: View {
                     OperatorRailStrip(
                         projection: projection,
                         snapshot: snapshot,
-                        railsEntered: railsEntered
+                        railsEntered: railsEntered,
+                        onInspect: { onInspect($0) }
                     )
                 } else {
                     ContentUnavailableView(
@@ -103,6 +104,7 @@ private struct OperatorRailStrip: View {
     let projection: LoadedProjection
     let snapshot: LayeredSnapshot
     let railsEntered: Bool
+    let onInspect: (InspectorItem) -> Void
 
     private var rails: [OperatorRail] {
         [
@@ -114,7 +116,8 @@ private struct OperatorRailStrip: View {
                 counts: [
                     ("Events", snapshot.publicStream.eventIds.count),
                     ("Replay pins", snapshot.publicStream.markerIds.count),
-                ]
+                ],
+                inspect: projection.latestMarker.map(InspectorItem.marker)
             ),
             OperatorRail(
                 title: "Private whispers",
@@ -124,7 +127,8 @@ private struct OperatorRailStrip: View {
                 counts: [
                     ("Artifacts", snapshot.privateState.artifactIds.count),
                     ("Envelopes", snapshot.privateState.commitmentEnvelopeIds.count),
-                ]
+                ],
+                inspect: nil
             ),
             OperatorRail(
                 title: "Alert rail",
@@ -134,7 +138,8 @@ private struct OperatorRailStrip: View {
                 counts: [
                     ("Active", snapshot.alerts.activeAlertIds.count),
                     ("Total", snapshot.alerts.alertIds.count),
-                ]
+                ],
+                inspect: nil
             ),
             OperatorRail(
                 title: "Intervention rail",
@@ -146,9 +151,32 @@ private struct OperatorRailStrip: View {
                 counts: [
                     ("Pending", snapshot.interventionQueue.pendingInterventionIds.count),
                     ("Open awaits", projection.live?.openAwaitIds.count ?? projection.home.openAwaitCount),
-                ]
+                ],
+                inspect: projection.live?.awaitingQueue.first.map(InspectorItem.liveAwait)
             ),
         ]
+    }
+
+    @ViewBuilder private func card(_ rail: OperatorRail) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: rail.icon)
+                    .foregroundStyle(rail.accent)
+                Text(rail.title)
+                    .font(.headline)
+            }
+            Text(rail.edge)
+                .font(.system(.title3, design: .rounded).weight(.semibold))
+                .foregroundStyle(rail.accent)
+                .lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                ForEach(rail.counts, id: \.0) { label, value in
+                    TagPillView(text: "\(label) \(value)", color: rail.accent)
+                }
+            }
+        }
     }
 
     var body: some View {
@@ -160,23 +188,12 @@ private struct OperatorRailStrip: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(Array(rails.enumerated()), id: \.element.id) { index, rail in
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack(spacing: 8) {
-                                Image(systemName: rail.icon)
-                                    .foregroundStyle(rail.accent)
-                                Text(rail.title)
-                                    .font(.headline)
-                            }
-                            Text(rail.edge)
-                                .font(.system(.title3, design: .rounded).weight(.semibold))
-                                .foregroundStyle(rail.accent)
-                                .lineLimit(3)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            Spacer(minLength: 0)
-                            HStack(spacing: 8) {
-                                ForEach(rail.counts, id: \.0) { label, value in
-                                    TagPillView(text: "\(label) \(value)", color: rail.accent)
-                                }
+                        Group {
+                            if let target = rail.inspect {
+                                Button { onInspect(target) } label: { card(rail) }
+                                    .buttonStyle(.plain)
+                            } else {
+                                card(rail)
                             }
                         }
                         .frame(width: 240, height: 190, alignment: .topLeading)
@@ -196,12 +213,13 @@ private struct OperatorRailStrip: View {
 }
 
 private struct OperatorRail: Identifiable {
-    let id = UUID()
+    var id: String { title }
     let title: String
     let icon: String
     let edge: String
     let accent: Color
     let counts: [(String, Int)]
+    var inspect: InspectorItem?
 }
 
 /// The awaiting queue as the operator's focal work: staged spotlight-style
