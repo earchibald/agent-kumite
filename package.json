@@ -1,6 +1,6 @@
 {
   "name": "@agent-kumite/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Core runtime schemas and validation helpers for Agent Kumite.",
   "scripts": {
     "test": "vitest run",
