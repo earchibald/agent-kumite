@@ -31,6 +31,10 @@ enum GameMotion {
     static let aftermathStaggerStep: TimeInterval = 0.12
     /// Upper bound on the staggered reveal so long timelines stay snappy.
     static let aftermathStaggerCap: TimeInterval = 0.96
+    /// Per-index delay added to each cast member's staged entrance.
+    static let castEntranceStep: TimeInterval = 0.09
+    /// Upper bound on the cast lineup so a full roster still enters briskly.
+    static let castEntranceCap: TimeInterval = 0.72
 
     static var spotlightHandoffAnimation: Animation {
         .spring(response: spotlightHandoff, dampingFraction: 0.82)
@@ -56,6 +60,13 @@ enum GameMotion {
 
     static func aftermathStaggerAnimation(forIndex index: Int) -> Animation {
         .easeOut(duration: spotlightHandoff).delay(AftermathSequence.delay(forIndex: index))
+    }
+
+    /// Entrance for the cast member at `index`, staged so the lineup walks on
+    /// one after another instead of popping in together.
+    static func castEntranceAnimation(forIndex index: Int) -> Animation {
+        .spring(response: spotlightHandoff, dampingFraction: 0.78)
+            .delay(CastEntrance.delay(forIndex: index))
     }
 }
 
@@ -94,6 +105,33 @@ enum AftermathSequence {
     static func delay(forIndex index: Int) -> TimeInterval {
         let raw = Double(max(0, index)) * GameMotion.aftermathStaggerStep
         return min(raw, GameMotion.aftermathStaggerCap)
+    }
+}
+
+enum CastEntrance {
+    /// Entrance delay for the cast member at `index`, clamped to the cap so a
+    /// full roster still finishes walking on quickly. Negative indices snap to 0.
+    static func delay(forIndex index: Int) -> TimeInterval {
+        let raw = Double(max(0, index)) * GameMotion.castEntranceStep
+        return min(raw, GameMotion.castEntranceCap)
+    }
+}
+
+enum EventTickerWindow {
+    /// The contiguous marker indices the live ticker should show: a fixed-size
+    /// window of `2 * radius + 1` that *slides* with the focal index instead of
+    /// shrinking at the timeline edges. Derived purely from canonical
+    /// `PresentationState` focus — never a timer. Returns `[]` for an empty
+    /// timeline; shows everything when the timeline is shorter than the window.
+    static func indices(count: Int, focus: Int, radius: Int) -> [Int] {
+        guard count > 0 else { return [] }
+
+        let span = max(1, 2 * radius + 1)
+        guard count > span else { return Array(0..<count) }
+
+        let clampedFocus = min(max(focus, 0), count - 1)
+        let start = min(max(clampedFocus - radius, 0), count - span)
+        return Array(start..<(start + span))
     }
 }
 
