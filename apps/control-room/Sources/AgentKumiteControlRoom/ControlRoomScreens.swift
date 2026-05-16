@@ -8,6 +8,8 @@ struct ArenaView: View {
         projection.replay.markers
     }
 
+    @State private var scrubDirection: ScrubDirection = .none
+
     var body: some View {
         if model.presentation.hasFocus, model.presentation.focusIndex < markers.count {
             let marker = markers[model.presentation.focusIndex]
@@ -23,6 +25,10 @@ struct ArenaView: View {
                     FocalBeatCard(marker: marker, projection: projection) {
                         model.inspect(.marker(marker))
                     }
+                    .id(marker.id)
+                    .spotlightHandoff(id: marker.id)
+                    .replayScrub(direction: scrubDirection, value: model.presentation.focusIndex)
+                    .betrayalFlash(active: BetrayalFlash.isTriggered(byMarkerType: marker.markerType))
 
                     TransportBar(model: model)
 
@@ -34,6 +40,12 @@ struct ArenaView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(ControlRoomBackdrop())
+            .onChange(of: model.presentation.focusIndex) { oldValue, newValue in
+                scrubDirection = ScrubDirection.between(
+                    previousIndex: oldValue,
+                    currentIndex: newValue
+                )
+            }
             .task(id: model.presentation.isPlaying) {
                 guard model.presentation.isPlaying else { return }
                 while model.presentation.isPlaying, model.presentation.isAtEnd == false {
@@ -191,7 +203,12 @@ struct HomeDashboardView: View {
                 .frame(minWidth: 260, idealWidth: 290)
 
                 ShellPanel(title: "Center Stage — Shrinking Pressure Shell") {
-                    PressureShellVisualView(rows: projection.callsheet.sortedByPressure)
+                    PressureShellVisualView(
+                        rows: projection.callsheet.sortedByPressure,
+                        contraction: ShellContraction.intensity(
+                            forBand: PressureBand(label: projection.pressurePresentation.band)
+                        )
+                    )
                 }
                 .frame(minWidth: 420, idealWidth: 560)
 
@@ -322,6 +339,8 @@ struct CallsheetView: View {
                             .padding(14)
                             .background(.quinary)
                             .clipShape(.rect(cornerRadius: 12))
+                            .id(selectedRow.id)
+                            .spotlightHandoff(id: selectedRow.id)
                         }
 
                         RivalryWebView(rows: projection.callsheet)
@@ -581,6 +600,7 @@ struct ReplayLabView: View {
                             }
                             .tag(marker.id)
                         }
+                        .animation(GameMotion.replayScrubAnimation, value: selectedMarkerId)
                     }
                 }
                 .frame(minHeight: 220)
@@ -642,6 +662,7 @@ struct AftermathLedgerView: View {
     let onInspect: (InspectorItem?) -> Void
 
     @State private var selectedStandingId: String?
+    @State private var storyAppeared = false
 
     var body: some View {
         if let aftermath = projection.aftermath {
@@ -673,6 +694,7 @@ struct AftermathLedgerView: View {
                                 .padding(12)
                                 .background(.quinary)
                                 .clipShape(.rect(cornerRadius: 10))
+                                .aftermathSequenced(index: index, appeared: storyAppeared)
                             }
 
                             Text("Interpret this column as the episode recap.")
@@ -751,6 +773,7 @@ struct AftermathLedgerView: View {
                 let item = aftermath.standings.first(where: { $0.id == newValue }).map(InspectorItem.standing)
                 onInspect(item)
             }
+            .onAppear { storyAppeared = true }
         } else {
             ContentUnavailableView(
                 "No Aftermath Yet",
@@ -963,6 +986,12 @@ private struct PressureBannerView: View {
                 .fill(projection.pressurePresentation.color)
                 .frame(width: 14, height: 14)
                 .padding(.top, 6)
+                .eventPulse(
+                    active: EventPulse.isActive(activeAlertCount: projection.home.activeAlertCount),
+                    strength: EventPulse.strength(
+                        forBand: PressureBand(label: projection.pressurePresentation.band)
+                    )
+                )
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(projection.pressurePresentation.headline)
@@ -1199,6 +1228,14 @@ private struct ControlRoomBackdrop: View {
 
     private struct PressureShellVisualView: View {
         let rows: [CallsheetRow]
+        /// 0 = open shell at full radius, 1 = collapsed. Derived from the
+        /// canonical pressure band, never a timer.
+        var contraction: Double = 0
+
+        /// Rings lose up to 30% of their radius as the band tightens.
+        private var shellScale: CGFloat {
+            1 - 0.3 * CGFloat(min(max(contraction, 0), 1))
+        }
 
         var body: some View {
             GeometryReader { geometry in
@@ -1207,15 +1244,15 @@ private struct ControlRoomBackdrop: View {
                 ZStack {
                     Circle()
                         .stroke(.primary, lineWidth: 3)
-                        .frame(width: min(geometry.size.width, geometry.size.height) * 0.7)
+                        .frame(width: min(geometry.size.width, geometry.size.height) * 0.7 * shellScale)
                     Circle()
                         .stroke(style: StrokeStyle(lineWidth: 2, dash: [12, 8]))
                         .foregroundStyle(.secondary)
-                        .frame(width: min(geometry.size.width, geometry.size.height) * 0.54)
+                        .frame(width: min(geometry.size.width, geometry.size.height) * 0.54 * shellScale)
                     Circle()
                         .stroke(style: StrokeStyle(lineWidth: 2, dash: [10, 8]))
                         .foregroundStyle(.tertiary)
-                        .frame(width: min(geometry.size.width, geometry.size.height) * 0.36)
+                        .frame(width: min(geometry.size.width, geometry.size.height) * 0.36 * shellScale)
 
                     ForEach(Array(zip(rows.prefix(points.count), points)), id: \.0.id) { row, point in
                         VStack(spacing: 2) {
@@ -1234,6 +1271,7 @@ private struct ControlRoomBackdrop: View {
                     Text("SAFE WINDOW COLLAPSING")
                         .font(.headline)
                 }
+                .animation(GameMotion.shellContractionAnimation, value: contraction)
             }
             .frame(minHeight: 360)
             .padding(12)
